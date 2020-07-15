@@ -11,13 +11,13 @@ from tqdm import tqdm
 from hparams import hp
 
 
-def save_feature(i_speech: int, s_path_speech: str, speech: ndarray) -> tuple:
+def save_feature(num_snr :int, i_speech: int, s_path_speech: str, speech: ndarray) -> tuple:
     spec_clean = np.ascontiguousarray(librosa.stft(speech, **hp.kwargs_stft))
     mag_clean = np.ascontiguousarray(np.abs(spec_clean)[..., np.newaxis])
     signal_power = np.mean(np.abs(speech)**2)
     list_dict = []
     list_snr_db = []
-    for _ in enumerate(args.num_snr):
+    for _ in enumerate(num_snr):
         snr_db = -6*np.random.rand()
         list_snr_db.append(snr_db)
         snr = librosa.db_to_power(snr_db)
@@ -60,7 +60,7 @@ if __name__ == "__main__":
         speech = sf.read(str(path_speech))[0].astype(np.float32)
         results.append(
             pool.apply_async(save_feature,
-                             (i_speech, str(path_speech), speech),
+                             (args.num_snr, i_speech, str(path_speech), speech),
                              )
         )
 

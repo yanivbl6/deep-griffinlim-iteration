@@ -9,9 +9,18 @@ from matplotlib import pyplot as plt
 from numpy import ndarray
 
 from hparams import hp
-from matlab_lib import Evaluation as EvalModule
+##from matlab_lib import Evaluation as EvalModule
+from pystoi import stoi
 
-EVAL_METRICS = EvalModule.metrics
+
+EVAL_METRICS = ('STOI')
+
+
+
+def EvalModule(clean, denoised, fs):
+    metrics = ('STOI')
+    d= stoi(clean, denoised, fs, extended = False)
+    return metrics, d
 
 
 def calc_using_eval_module(y_clean: ndarray, y_est: ndarray,
@@ -41,12 +50,12 @@ def calc_using_eval_module(y_clean: ndarray, y_est: ndarray,
                 sum_result = result
             else:
                 sum_result += result
-        sum_result = sum_result.tolist()
+        ##sum_result = sum_result.tolist()
     else:
         # noinspection PyArgumentList
         metrics, sum_result = EvalModule(y_clean[0, :T_ys[0]], y_est[0, :T_ys[0]], hp.fs)
 
-    return {k: v for k, v in zip(metrics, sum_result)}
+    return {'STOI': sum_result}
 
 
 def reconstruct_wave(*args: ndarray, n_iter=0, n_sample=-1) -> ndarray:
