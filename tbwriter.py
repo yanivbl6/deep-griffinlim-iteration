@@ -46,7 +46,7 @@ class CustomWriter(SummaryWriter):
         # audio
         self.y_scale = 1.
 
-    def write_one(self, step: int,
+    def write_one(self, step: int, idx: int = 0,
                   out: ndarray = None,
                   res: ndarray = None,
                   suffix: str = None,
@@ -62,8 +62,7 @@ class CustomWriter(SummaryWriter):
         """
 
         assert out is not None and res is not None
-        result_eval_glim = self.write_x_y(kwargs, step) if kwargs else None
-
+        result_eval_glim = self.write_x_y(kwargs, step, idx) if kwargs else None
         assert self.reused_sample
         y_wav = self.reused_sample['y_wav']
         length = self.reused_sample['length']
@@ -80,11 +79,16 @@ class CustomWriter(SummaryWriter):
         #     out_wav_y_ph if eval_with_y_ph else out_wav
         # )
 
-        if hp.draw_test_fig or self.group == 'train':
-            fig_out = draw_spectrogram(np.abs(res), **self.kwargs_fig)
-            self.add_figure(f'{self.group}/4_DNN_Output_Spectrum{suffix}', fig_out, step)
 
-        self.add_audio(f'{self.group}/3_DeGLI_output',
+        if hp.draw_test_fig or self.group == 'train':
+            res = res.squeeze()
+            fig_out = draw_spectrogram(res, **self.kwargs_fig)
+            self.add_figure(f'{self.group}Audio{idx}/4_DNN_Output_Spectrum', fig_out, step)
+            ##fig_out2 = draw_spectrogram(np.abs(res - diff), **self.kwargs_fig)
+            ##self.add_figure(f'{self.group}Audio{idx}/5_DNN_Output_Diff', fig_out2, step)
+
+
+        self.add_audio(f'{self.group}Audio{idx}/3_DeGLI_output',
                        torch.from_numpy(out_wav / self.y_scale),
                        step,
                        sample_rate=hp.fs)
@@ -100,7 +104,13 @@ class CustomWriter(SummaryWriter):
         return np.array([list(dict_eval.values()),
                          list(self.dict_eval_glim.values())], dtype=np.float32)
 
-    def write_x_y(self, kwargs: Dict[str, ndarray], step: int) -> mp.pool.AsyncResult:
+    def getSignals(self, kwargs: Dict[str, ndarray]):
+        x = kwargs['x'].squeeze()
+        y_mag = kwargs['y_mag'].squeeze()
+        y = kwargs['y'].squeeze()
+        return x,y, y_mag
+
+    def write_x_y(self, kwargs: Dict[str, ndarray], step: int, idx: int) -> mp.pool.AsyncResult:
         # F, T, 1
         x = kwargs['x'].squeeze()
         y_mag = kwargs['y_mag'].squeeze()
@@ -130,20 +140,20 @@ class CustomWriter(SummaryWriter):
             fig_y = draw_spectrogram(y_mag)
             fig_glimres = draw_spectrogram(glim_mag-y_mag, **self.kwargs_fig)
 
-            self.add_figure(f'{self.group}/0_Noisy_Spectrum', fig_x, step)
-            self.add_figure(f'{self.group}/1_GLim_Spectrum', fig_glim, step)
-            self.add_figure(f'{self.group}/2_Clean_Spectrum', fig_y, step)
-            self.add_figure(f'{self.group}/3_Residual_Spectrum', fig_glimres, step)
+            ##self.add_figure(f'{self.group}Audio{idx}/0_Noisy_Spectrum', fig_x, step)
+            self.add_figure(f'{self.group}Audio{idx}/1_GLim_Spectrum', fig_glim, step)
+            self.add_figure(f'{self.group}Audio{idx}/2_Clean_Spectrum', fig_y, step)
+            self.add_figure(f'{self.group}Audio{idx}/3_Residual_Spectrum', fig_glimres, step)
 
-        self.add_audio(f'{self.group}/0_Noisy_Wave',
-                       torch.from_numpy(x_wav / (np.abs(x_wav).max() / 0.5)),
-                       step,
-                       sample_rate=hp.fs)
-        self.add_audio(f'{self.group}/1_Clean_Wave',
+        # self.add_audio(f'{self.group}Audio{idx}/0_Noisy_Wave',
+        #                torch.from_numpy(x_wav / (np.abs(x_wav).max() / 0.5)),
+        #                step,
+        #                sample_rate=hp.fs)
+        self.add_audio(f'{self.group}Audio{idx}/1_Clean_Wave',
                        torch.from_numpy(y_wav / self.y_scale),
                        step,
                        sample_rate=hp.fs)
-        self.add_audio(f'{self.group}/2_GLim_Wave',
+        self.add_audio(f'{self.group}Audio{idx}/2_GLim_Wave',
                        torch.from_numpy(glim_wav / self.y_scale),
                        step,
                        sample_rate=hp.fs)
@@ -151,4 +161,5 @@ class CustomWriter(SummaryWriter):
                                   y_wav=y_wav,
                                   length=length,
                                   )
+
         return result_eval_glim

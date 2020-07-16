@@ -284,7 +284,7 @@ class Trainer:
                 else:
                     one_sample = dict()
 
-                self.writer.write_one(epoch, **one_sample, **out_one, suffix=suffix)
+                self.writer.write_one(epoch, 0 , **one_sample, **out_one, suffix=suffix)
 
         self.writer.add_scalar(f'loss/valid{suffix}', avg_loss.get_average(), epoch)
 
@@ -334,9 +334,9 @@ class Trainer:
                 else:
                     sub.register_forward_hook(save_forward)
 
-        pbar = tqdm(loader, desc=group, dynamic_ncols=True)
+        ##pbar = tqdm(loader, desc=group, dynamic_ncols=True)
         cnt_sample = 0
-        for i_iter, data in enumerate(pbar):
+        for i_iter, data in enumerate(loader):
             # get data
             x, mag, max_length, y = self.preprocess(data)  # B, C, F, T
             T_ys = data['T_ys']
@@ -345,13 +345,12 @@ class Trainer:
             if module_counts is not None:
                 module_counts = defaultdict(int)
 
-            if 0 < hp.n_save_block_outs == i_iter:
-                break
+            # if 0 < hp.n_save_block_outs == i_iter:
+            #     break
             _, output, residual = self.model(x, mag, max_length,
                                              repeat=hp.repeat_test)
-
             # write summary
-            for i_b in range(len(T_ys)):
+            for i_b in  tqdm(range(len(T_ys)), desc=group, dynamic_ncols=True):
                 i_sample = cnt_sample + i_b
                 one_sample = ComplexSpecDataset.decollate_padded(data, i_b)  # F, T, C
 
@@ -361,8 +360,7 @@ class Trainer:
                     logdir / hp.form_result.format(i_sample),
                     **one_sample, **out_one
                 )
-
-                measure = self.writer.write_one(i_sample, **out_one, **one_sample,
+                measure = self.writer.write_one(i_sample, i_b, **out_one, **one_sample,
                                                 suffix=f'_{hp.repeat_test}')
                 if avg_measure is None:
                     avg_measure = AverageMeter(init_value=measure)

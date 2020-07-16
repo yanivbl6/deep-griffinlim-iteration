@@ -52,7 +52,7 @@ class _HyperParameters:
 
     # summary
     period_save_state: int = 5
-    draw_test_fig: bool = False
+    draw_test_fig: bool = True
     n_save_block_outs: int = 0
     n_glim_iter: int = 100
     repeat_train: int = 2
