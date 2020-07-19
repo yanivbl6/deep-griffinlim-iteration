@@ -17,6 +17,14 @@ StrOrSeq = TypeVar('StrOrSeq', str, Sequence[str])
 TupOrSeq = TypeVar('TupOrSeq', tuple, Sequence[tuple])
 DataDict = Dict[str, Any]
 
+def reround(x):
+    s1, s2 ,s3 = x.shape
+    s1 = (s1//4) * 4
+    s2 = (s2//4) * 4
+    x = x[:s1,:,:]
+    x = x[:,:s2,:]
+    return x
+
 
 class ComplexSpecDataset(Dataset):
     """ Directional Spectrogram Dataset
@@ -60,6 +68,7 @@ class ComplexSpecDataset(Dataset):
             Values can be an integer, ndarray, or str.
         """
         sample = dict()
+
         with np.load(self._all_files[idx], mmap_mode='r') as npz_data:
             for k, v in self._needs.items():
                 if v.value:
@@ -73,12 +82,19 @@ class ComplexSpecDataset(Dataset):
                         if data.dtype == np.complex64:
                             assert data.flags['C_CONTIGUOUS']
                             data = data.view(dtype=np.float32).reshape((*data.shape, 2))
-                        sample[k] = torch.from_numpy(data)
+                        
+                        ##print(k)
+                        ##data = reround(data)
+                        ##print(data.shape)
 
+                        sample[k] = torch.from_numpy(data)
+                        
         for xy in ('x', 'y'):
             sample[f'T_{xy}'] = sample[xy].shape[1]
 
         return sample
+
+
 
     @torch.no_grad()
     def pad_collate(self, batch: List[DataDict]) -> DataDict:

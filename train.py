@@ -9,7 +9,8 @@ import torch
 import torch.optim.lr_scheduler as lr_scheduler
 from numpy import ndarray
 from torch import Tensor, nn
-from torch.optim import Adam
+from torch.optim import Adam, SGD
+
 from torch.utils.data import DataLoader
 # from torchsummary import summary
 from tqdm import tqdm
@@ -24,7 +25,10 @@ from utils import AverageMeter, arr2str, draw_spectrogram, print_to_file
 
 class Trainer:
     def __init__(self, path_state_dict=''):
-        self.model = DeGLI(**hp.model)
+
+        self.writer: Optional[CustomWriter] = None
+
+        self.model = DeGLI(self.writer, **hp.model)
         self.module = self.model
         self.criterion = nn.L1Loss(reduction='none')
         self.optimizer = Adam(self.model.parameters(),
@@ -32,12 +36,18 @@ class Trainer:
                               weight_decay=hp.weight_decay,
                               )
 
+        # self.optimizer = SGD(self.model.parameters(),
+        #                       lr=hp.learning_rate,
+        #                       weight_decay=hp.weight_decay,
+        #                       )
+
+
+
         self.__init_device(hp.device, hp.out_device)
 
         self.scheduler = lr_scheduler.ReduceLROnPlateau(self.optimizer, **hp.scheduler)
         self.max_epochs = hp.n_epochs
 
-        self.writer: Optional[CustomWriter] = None
 
         self.valid_eval_sample: Dict[str, Any] = dict()
 
@@ -180,6 +190,11 @@ class Trainer:
         self.writer = CustomWriter(str(logdir), group='train', purge_step=first_epoch)
 
         # Start Training
+        step = 0
+
+        loss_valid = self.validate(loader_valid, logdir, 0, step , repeat=hp.repeat_train)
+
+
         for epoch in range(first_epoch, hp.n_epochs):
             self.writer.add_scalar('loss/lr', self.optimizer.param_groups[0]['lr'], epoch)
             print()
@@ -192,10 +207,10 @@ class Trainer:
                 # get data
                 x, mag, max_length, y = self.preprocess(data)  # B, C, F, T
                 T_ys = data['T_ys']
-
                 # forward
                 output_loss, _, _ = self.model(x, mag, max_length,
-                                               repeat=hp.repeat_train)  # B, C, F, T
+                                               repeat=hp.repeat_train, train_step= step)  # B, C, F, T
+                step = step + 1
 
                 loss = self.calc_loss(output_loss, y, T_ys)
 
@@ -212,12 +227,15 @@ class Trainer:
                 pbar.set_postfix_str(f'{avg_loss.get_average():.1e}')
                 avg_grad_norm.update(grad_norm)
 
-            self.writer.add_scalar('loss/train', avg_loss.get_average(), epoch)
-            self.writer.add_scalar('loss/grad', avg_grad_norm.get_average(), epoch)
+                if i_iter % 25 == 0:
+                    self.writer.add_scalar('loss/train', avg_loss.get_average(), epoch*len(loader_train)+ i_iter)
+                    self.writer.add_scalar('loss/grad', avg_grad_norm.get_average(), epoch*len(loader_train) +  i_iter)
+                    avg_loss = AverageMeter(float)
+                    avg_grad_norm = AverageMeter(float)
 
             # Validation
             # loss_valid = self.validate(loader_valid, logdir, epoch)
-            loss_valid = self.validate(loader_valid, logdir, epoch, repeat=hp.repeat_train)
+            loss_valid = self.validate(loader_valid, logdir, epoch, step , repeat=hp.repeat_train)
 
             # save loss & model
             if epoch % hp.period_save_state == hp.period_save_state - 1:
@@ -236,7 +254,7 @@ class Trainer:
         self.writer.close()
 
     @torch.no_grad()
-    def validate(self, loader: DataLoader, logdir: Path, epoch: int, repeat=1):
+    def validate(self, loader: DataLoader, logdir: Path, epoch: int, step, repeat=1):
         """ Evaluate the performance of the model.
 
         :param loader: DataLoader to use.
@@ -250,14 +268,16 @@ class Trainer:
         avg_loss = AverageMeter(float)
 
         pbar = tqdm(loader, desc='validate ', postfix='[0]', dynamic_ncols=True)
+        step = -1
         for i_iter, data in enumerate(pbar):
             # get data
+            step = step + 1
             x, mag, max_length, y = self.preprocess(data)  # B, C, F, T
             T_ys = data['T_ys']
 
             # forward
             output_loss, output, residual = self.model(x, mag, max_length,
-                                                       repeat=repeat)
+                                                       repeat=repeat, train_step= step )
 
             # loss
             loss = self.calc_loss(output_loss, y, T_ys)

@@ -45,13 +45,13 @@ class _HyperParameters:
     n_data: int = 0  # <=0 to use all data
     train_ratio: float = 0.70
     n_epochs: int = 200
-    batch_size: int = 16
+    batch_size: int = 4
     learning_rate: float = 5e-4
     thr_clip_grad: float = 4.
     weight_decay: float = 1e-3  # Adam weight_decay
 
     # summary
-    period_save_state: int = 5
+    period_save_state: int = 1
     draw_test_fig: bool = True
     n_save_block_outs: int = 0
     n_glim_iter: int = 100
@@ -60,7 +60,7 @@ class _HyperParameters:
 
     # paths
     # logdir will be converted to type Path in the init_dependent_vars function
-    logdir: str = f'./result/test'
+    logdir: str = f'./result/deq3'
     path_speech: Path = Path('./data/TIMIT')
     path_feature: Path = Path('./data')
     # path_feature: Path = Path('./backup')

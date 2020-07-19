@@ -57,7 +57,9 @@ if not (args.train ^ args.test) or args.epoch < -1:
 logdir_train = hp.logdir / 'train'
 if (args.train and args.epoch == -1 and
         logdir_train.exists() and list(logdir_train.glob(tfevents_fname))):
-    ans = input(form_overwrite_msg.format(logdir_train))
+    ##ans = input(form_overwrite_msg.format(logdir_train))
+    ans = 'y'
+
     if ans.lower() == 'y':
         shutil.rmtree(logdir_train)
         try:
