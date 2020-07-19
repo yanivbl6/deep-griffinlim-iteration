@@ -60,9 +60,9 @@ class _HyperParameters:
 
     # paths
     # logdir will be converted to type Path in the init_dependent_vars function
-    logdir: str = f'./result/deq3'
-    path_speech: Path = Path('./data/TIMIT')
-    path_feature: Path = Path('./data')
+    logdir: str = f'/result/deq3'
+    path_speech: Path = Path('/data/TIMIT')
+    path_feature: Path = Path('/data')
     # path_feature: Path = Path('./backup')
     sfx_featuredir: str = ''
 

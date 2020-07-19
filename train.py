@@ -104,7 +104,7 @@ class Trainer:
         if type(device) == int:
             device = [device]
         elif type(device) == str:
-            if device[0] = 'a':
+            if device[0] == 'a':
                 device = [x for x in range(torch.cuda.device_count())]
             else:
                 device = [int(d.replace('cuda:', '')) for d in device.split(",")]
