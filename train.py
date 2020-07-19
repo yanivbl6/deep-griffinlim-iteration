@@ -11,6 +11,8 @@ from numpy import ndarray
 from torch import Tensor, nn
 from torch.optim import Adam, SGD
 
+
+
 from torch.utils.data import DataLoader
 # from torchsummary import summary
 from tqdm import tqdm
@@ -102,7 +104,11 @@ class Trainer:
         if type(device) == int:
             device = [device]
         elif type(device) == str:
-            device = [int(device.replace('cuda:', ''))]
+            if device[0] = 'a':
+                device = [x for x in range(torch.cuda.device_count())]
+            else:
+                device = [int(d.replace('cuda:', '')) for d in device.split(",")]
+            print("Used devices = %s" % device)
         else:  # sequence of devices
             if type(device[0]) != int:
                 device = [int(d.replace('cuda:', '')) for d in device]
@@ -114,6 +120,7 @@ class Trainer:
                 self.out_device = torch.device(f'cuda:{out_device}')
             else:
                 self.out_device = torch.device(out_device)
+            self.out_device = 0
             self.str_device = ', '.join([f'cuda:{d}' for d in device])
 
             self.model = nn.DataParallel(self.model,
