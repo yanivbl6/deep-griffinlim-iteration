@@ -37,7 +37,7 @@ class _HyperParameters:
     fs: int = 16000
     n_fft: int = 512
     l_frame: int = 512
-    n_freq: int = 256
+    n_freq: int = 257
     l_hop: int = 256
     num_snr: int = 3
 
@@ -66,9 +66,29 @@ class _HyperParameters:
     # path_feature: Path = Path('./backup')
     sfx_featuredir: str = ''
 
+
+    ## deq parameters
+    use_deq: bool = True
+    wnorm=False,
+    num_branches: int = 1
+    base_channels: int = 16
+    ratio2head: int = 2
+    fuse_method: str = "SUM"
+    droprate: float = 0.0
+    final_multiplier: int = 2
+    pretrain_steps: int = 500
+    f_thres: int = 24
+    b_thres: int = 24
+    num_layers: int  = 3
+    ch_hidden: int = 16
+    k1: int = 11 
+    k2: int  = 7 
+    p2: int = 3
+
     # file names
     form_feature: str = '{:04d}_{:+.2f}dB.npz'  # i_speech, snr_db
     form_result: str = 'spec_{}.mat'
+
 
     # defined in __post_init__
     channels: Dict[str, Channel] = field(init=False)
@@ -85,22 +105,6 @@ class _HyperParameters:
     kwargs_stft: Dict[str, Any] = None
     kwargs_istft: Dict[str, Any] = None
 
-    ## deq parameters
-    wnorm=False,
-    num_branches = 1
-    base_channels = 16
-    ratio2head = 2
-    fuse_method = "SUM"
-    droprate = 0.0
-    final_multiplier = 2
-    pretrain_steps = 500
-    f_thres = 24
-    b_thres = 24
-    num_layers  = 3
-    ch_hidden= 16
-    k1 = 11 
-    k2 = 7 
-    p2 = 3
 
     def __post_init__(self):
         self.channels = dict(path_speech=Channel.NONE,
@@ -114,7 +118,7 @@ class _HyperParameters:
                           hop_length=self.l_hop,
                           depth=2,
                           out_all_block=True,
-                          use_deq = True
+                          use_deq = self.use_deq
                           )
 
         self.deq_config = dict( wnorm=False,

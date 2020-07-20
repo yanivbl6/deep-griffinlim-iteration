@@ -232,7 +232,7 @@ def replace_magnitude(x, mag):
 
 
 class DeGLI(nn.Module):
-    def __init__(self, writer, dedeq_config , n_fft: int, hop_length: int, depth=1, out_all_block=True, use_deq = True):
+    def __init__(self, writer, dedeq_config , n_fft: int, hop_length: int, depth:int, out_all_block:bool, use_deq: bool):
         super().__init__()
         self.n_fft = n_fft
         self.hop_length = hop_length
