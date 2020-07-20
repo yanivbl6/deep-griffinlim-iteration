@@ -30,7 +30,9 @@ class Trainer:
 
         self.writer: Optional[CustomWriter] = None
 
-        self.model = DeGLI(self.writer, **hp.model)
+        self.model = DeGLI(self.writer, hp.deq_config, **hp.model)
+
+
         self.module = self.model
         self.criterion = nn.L1Loss(reduction='none')
         self.optimizer = Adam(self.model.parameters(),
@@ -284,7 +286,7 @@ class Trainer:
 
             # forward
             output_loss, output, residual = self.model(x, mag, max_length,
-                                                       repeat=repeat, train_step= step )
+                                                       repeat=repeat, train_step= 1000000 )
 
             # loss
             loss = self.calc_loss(output_loss, y, T_ys)

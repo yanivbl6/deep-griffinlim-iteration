@@ -31,31 +31,30 @@ class ConvGLU(nn.Module):
 
 
 class DeGLI_DEQ(nn.Module):
-    def __init__(self, wnorm = False, writer = None):
+    def __init__(self, writer, wnorm: bool, num_branches: int, base_channels: int, ratio2head: int, fuse_method: str,
+                 droprate: float, final_multiplier: int, pretrain_steps:int, f_thres:int, b_thres:int, num_layers:int,
+                 ch_hidden: int, k1:int, k2:int, p2:int):
+
         super().__init__()
-        self.wnorm = wnorm
+
+        ## parameters ---------------------------
         self.writer = writer
-        ch_hidden = 16
-
-
-        self.convglu_first = ConvGLU(6, ch_hidden, kernel_size=(5, 5), batchnorm=True)
-
-        self.num_branches = 1
+        self.wnorm = wnorm
+        self.num_branches = num_branches
         self.num_blocks = [1] * self.num_branches
-        self.num_channels = [ 16*(2**x) for x in range(self.num_branches)]
-        self.head_channels = [x//2 for x in self.num_channels]
-
+        self.num_channels = [ base_channels*(2**x) for x in range(self.num_branches)]
+        self.head_channels = [x//ratio2head for x in self.num_channels]
         self.block_type = BasicBlock
-        self.fuse_method = 'SUM'
-        self.droprate = 0.00
+        self.fuse_method = fuse_method
+        self.droprate = droprate
         self.init_chansize = self.num_channels[0]
-        self.final_chansize = self.num_channels[-1]*2
+        self.final_chansize = self.num_channels[-1]*final_multiplier
+        self.pretrain_steps = pretrain_steps
+        self.f_thres = f_thres
+        self.b_thres = b_thres
+        self.num_layers = num_layers ## for pretrain
 
-        self.pretrain_steps = 500
-        self.f_thres = 24
-        self.b_thres = 24
-        self.num_layers = 3 ## for pretrain
-
+        self.convglu_first = ConvGLU(6, ch_hidden, kernel_size=(k1, k1), batchnorm=True)
         self.fullstage = MDEQModule(self.num_branches, self.block_type, self.num_blocks, self.num_channels, self.fuse_method, dropout=self.droprate)
         self.fullstage_copy = copy.deepcopy(self.fullstage)
 
@@ -73,7 +72,7 @@ class DeGLI_DEQ(nn.Module):
         self.iodrop = VariationalHidDropout2d(0.0)
 
         self.convglu_last = ConvGLU(2*ch_hidden, ch_hidden)
-        self.conv = nn.Conv2d(ch_hidden, 2, kernel_size=(7, 7), padding=(3, 3))
+        self.conv = nn.Conv2d(ch_hidden, 2, kernel_size=(k2, k2), padding=(p2, p2))
 
         self.incre_modules, self.downsamp_modules, self.final_layer = self._make_head(self.num_channels)
             
@@ -233,7 +232,7 @@ def replace_magnitude(x, mag):
 
 
 class DeGLI(nn.Module):
-    def __init__(self, writer, n_fft: int, hop_length: int, depth=1, out_all_block=True):
+    def __init__(self, writer, dedeq_config , n_fft: int, hop_length: int, depth=1, out_all_block=True, use_deq = True):
         super().__init__()
         self.n_fft = n_fft
         self.hop_length = hop_length
@@ -242,7 +241,10 @@ class DeGLI(nn.Module):
         self.window = nn.Parameter(torch.hann_window(n_fft), requires_grad=False)
         self.istft = InverseSTFT(n_fft, hop_length=self.hop_length, window=self.window.data)
 
-        self.dnns = nn.ModuleList([DeGLI_DEQ(writer = writer) for _ in range(depth)])
+        if not use_deq:
+            self.dnns = nn.ModuleList([DeGLI_DNN() for _ in range(depth)])
+        else:
+            self.dnns = nn.ModuleList([DeGLI_DEQ(writer = writer, **dedeq_config) for _ in range(depth)])
 
     def stft(self, x):
         return torch.stft(x, n_fft=self.n_fft, hop_length=self.hop_length, window=self.window)

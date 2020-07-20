@@ -37,13 +37,13 @@ class _HyperParameters:
     fs: int = 16000
     n_fft: int = 512
     l_frame: int = 512
-    n_freq: int = 257
+    n_freq: int = 256
     l_hop: int = 256
     num_snr: int = 3
 
     # training
     n_data: int = 0  # <=0 to use all data
-    train_ratio: float = 0.70
+    train_ratio: float = 0.90
     n_epochs: int = 200
     batch_size: int = 4
     learning_rate: float = 5e-4
@@ -76,11 +76,31 @@ class _HyperParameters:
     scheduler: Dict[str, Any] = field(init=False)
     spec_data_names: Dict[str, str] = field(init=False)
 
+    deq_config: Dict[str, Any] = field(init=False)
+
+
     # dependent variables
     dummy_input_size: Tuple = None
     dict_path: Dict[str, Path] = None
     kwargs_stft: Dict[str, Any] = None
     kwargs_istft: Dict[str, Any] = None
+
+    ## deq parameters
+    wnorm=False,
+    num_branches = 1
+    base_channels = 16
+    ratio2head = 2
+    fuse_method = "SUM"
+    droprate = 0.0
+    final_multiplier = 2
+    pretrain_steps = 500
+    f_thres = 24
+    b_thres = 24
+    num_layers  = 3
+    ch_hidden= 16
+    k1 = 11 
+    k2 = 7 
+    p2 = 3
 
     def __post_init__(self):
         self.channels = dict(path_speech=Channel.NONE,
@@ -94,7 +114,27 @@ class _HyperParameters:
                           hop_length=self.l_hop,
                           depth=2,
                           out_all_block=True,
+                          use_deq = True
                           )
+
+        self.deq_config = dict( wnorm=False,
+                                num_branches = self.num_branches,
+                                base_channels = self.base_channels,
+                                ratio2head = self.ratio2head,
+                                fuse_method = self.fuse_method,
+                                droprate = self.droprate,
+                                final_multiplier = self.final_multiplier,
+                                pretrain_steps = self.pretrain_steps,
+                                f_thres = self.f_thres,
+                                b_thres = self.b_thres,
+                                num_layers  = self.num_layers,
+                                ch_hidden= self.ch_hidden,
+                                k1 = self.k1, 
+                                k2 = self.k2, 
+                                p2 = self.p2
+                                )
+
+
         self.scheduler = dict(mode='min',
                               factor=0.6,
                               patience=5,
