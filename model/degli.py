@@ -54,7 +54,7 @@ class DeGLI_DEQ(nn.Module):
         self.pretrain_steps = 500
         self.f_thres = 24
         self.b_thres = 24
-        self.num_layers = 3
+        self.num_layers = 3 ## for pretrain
 
         self.fullstage = MDEQModule(self.num_branches, self.block_type, self.num_blocks, self.num_channels, self.fuse_method, dropout=self.droprate)
         self.fullstage_copy = copy.deepcopy(self.fullstage)
@@ -203,7 +203,7 @@ class DeGLI_DEQ(nn.Module):
         return nn.Sequential(*layers)
 
 class DeGLI_DNN(nn.Module):
-    def __init__(self):
+    def __init__(self,writer=None):
         super().__init__()
         ch_hidden = 16
         self.convglu_first = ConvGLU(6, ch_hidden, kernel_size=(11, 11), batchnorm=True)

@@ -242,7 +242,7 @@ class Trainer:
 
             # Validation
             # loss_valid = self.validate(loader_valid, logdir, epoch)
-            loss_valid = self.validate(loader_valid, logdir, epoch, step , repeat=hp.repeat_train)
+            loss_valid = self.validate(loader_valid, logdir, epoch+1, step , repeat=hp.repeat_train)
 
             # save loss & model
             if epoch % hp.period_save_state == hp.period_save_state - 1:
@@ -251,7 +251,7 @@ class Trainer:
                      self.optimizer.state_dict(),
                      self.scheduler.state_dict(),
                      ),
-                    logdir / f'{epoch}.pt'
+                    logdir / f'{epoch+1}.pt'
                 )
 
             # Early stopping
