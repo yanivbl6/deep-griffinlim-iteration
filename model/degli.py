@@ -278,3 +278,31 @@ class DeGLI(nn.Module):
         final_out = replace_magnitude(x, mag)
 
         return out_repeats, final_out, residual
+
+    def plain_gla(self, x, mag, max_length=None, repeat=1, train_step = -1):
+        if isinstance(max_length, torch.Tensor):
+            max_length = max_length.item()
+
+        out_repeats = []
+        for ii in range(repeat):
+            for dnn in self.dnns:
+                # B, 2, F, T
+                mag_replaced = replace_magnitude(x, mag)
+
+                # B, F, T, 2
+                waves = self.istft(mag_replaced.permute(0, 2, 3, 1), length=max_length)
+                consistent = self.stft(waves)
+
+                # B, 2, F, T
+                consistent = consistent.permute(0, 3, 1, 2)
+                x = consistent
+            if self.out_all_block:
+                out_repeats.append(x)
+
+        if self.out_all_block:
+            out_repeats = torch.stack(out_repeats, dim=1)
+        else:
+            out_repeats = x.unsqueeze(1)
+
+        final_out = replace_magnitude(x, mag)
+        return out_repeats, final_out

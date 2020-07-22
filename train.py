@@ -24,6 +24,12 @@ from model import DeGLI
 from tbwriter import CustomWriter
 from utils import AverageMeter, arr2str, draw_spectrogram, print_to_file
 
+from time import time
+
+def ms(stime = None):
+    if stime is None:
+        return int(time() * 1000)
+    return (int(time() * 1000) - stime)
 
 class Trainer:
     def __init__(self, path_state_dict=''):
@@ -155,6 +161,8 @@ class Trainer:
                     dataset: ComplexSpecDataset) -> Dict[str, ndarray]:
         dict_one = dict(out=output, res=residual)
         for key in dict_one:
+            if dict_one[key] is None:
+                continue
             one = dict_one[key][idx, :, :, :Ts[idx]]
             one = one.permute(1, 2, 0).contiguous()  # F, T, 2
 
@@ -366,8 +374,14 @@ class Trainer:
         ##pbar = tqdm(loader, desc=group, dynamic_ncols=True)
         cnt_sample = 0
         for i_iter, data in enumerate(loader):
+
+            sampleDict ={}
             # get data
             x, mag, max_length, y = self.preprocess(data)  # B, C, F, T
+
+            if hp.noisy_init:
+                x = torch.normal(0,1,x.shape).cuda(self.in_device)
+
             T_ys = data['T_ys']
 
             # forward
@@ -376,38 +390,80 @@ class Trainer:
 
             # if 0 < hp.n_save_block_outs == i_iter:
             #     break
-            _, output, residual = self.model(x, mag, max_length,
-                                             repeat=hp.repeat_test)
-            # write summary
-            for i_b in  tqdm(range(len(T_ys)), desc=group, dynamic_ncols=True):
-                i_sample = cnt_sample + i_b
-                one_sample = ComplexSpecDataset.decollate_padded(data, i_b)  # F, T, C
+            repeats =1
 
-                out_one = self.postprocess(output, residual, T_ys, i_b, loader.dataset)
+            for _ in range(3):
+                _, output, residual = self.model(x, mag, max_length,
+                                                repeat=1) ##warn up!
 
-                ComplexSpecDataset.save_dirspec(
-                    logdir / hp.form_result.format(i_sample),
-                    **one_sample, **out_one
-                )
-                measure = self.writer.write_one(i_sample, i_b, **out_one, **one_sample,
-                                                suffix=f'_{hp.repeat_test}')
-                if avg_measure is None:
-                    avg_measure = AverageMeter(init_value=measure)
-                else:
+            while repeats <= hp.repeat_test:
+                stime = ms()
+                _, output, residual = self.model(x, mag, max_length,
+                                                repeat=repeats)
+                avg_measure = AverageMeter()
+                avg_measure2 = AverageMeter()
+
+                etime = ms(stime)
+                speed =   (1000* max_length / hp.fs) * len(T_ys) / (etime)
+                ##print("degli: %d repeats, length: %d, time: %d miliseconds, ratio = %.02f" % (repeats, max_length , etime, speed))
+                self.writer.add_scalar("Test Performance/degli", speed, repeats)
+                # write summary
+                for i_b in  tqdm(range(len(T_ys)), desc=group, dynamic_ncols=True):
+                    i_sample = cnt_sample + i_b
+
+                    if not i_b in sampleDict:
+                        one_sample = ComplexSpecDataset.decollate_padded(data, i_b)
+                        reused_sample, result_eval_glim = self.writer.write_zero(0, i_b, **one_sample, suffix="Base stats")
+                        sampleDict[i_b] = (reused_sample, result_eval_glim)
+
+                    sampleItem  = sampleDict[i_b]
+                    reused_sample = sampleItem[0]
+                    result_eval_glim = sampleItem[1]
+
+                    out_one = self.postprocess(output, residual, T_ys, i_b, loader.dataset)
+
+                    # ComplexSpecDataset.save_dirspec(
+                    #     logdir / hp.form_result.format(i_sample),
+                    #     **one_sample, **out_one
+                    # )
+
+                    measure = self.writer.write_one(repeats, i_b, result_eval_glim, reused_sample ,**out_one, suffix="deGLI")
+
                     avg_measure.update(measure)
-                # print
-                # str_measure = arr2str(measure).replace('\n', '; ')
-                # pbar.write(str_measure)
-            cnt_sample += len(T_ys)
+                                        
+                stime = ms()
+                _, output = self.model.plain_gla(x, mag, max_length,
+                                                repeat=repeats)
+
+                etime = ms(stime)
+                speed =   (1000* max_length / hp.fs) * len(T_ys) / (etime)
+                ##print("pure gla: %d repeats, length: %d, time: %d miliseconds, ratio = %.02f" % (repeats, max_length , etime, speed))
+                self.writer.add_scalar("Test Performance/gla", speed, repeats)
+
+                # write summary
+                for i_b in  tqdm(range(len(T_ys)), desc=group, dynamic_ncols=True):
+                    i_sample = cnt_sample + i_b
+                    sampleItem  = sampleDict[i_b]
+                    reused_sample = sampleItem[0]
+                    result_eval_glim = sampleItem[1]
+                    out_one = self.postprocess(output, None, T_ys, i_b, loader.dataset)
+                    measure = self.writer.write_one(repeats, i_b, result_eval_glim, reused_sample ,**out_one, suffix="GLI")
+                    avg_measure2.update(measure)
+
+
+                cnt_sample += len(T_ys)
+
+                self.writer.add_scalar(f'STOI/Average Measure/deGLI', avg_measure.get_average()[0], repeats)
+                self.writer.add_scalar(f'STOI/Average Measure/GLA', avg_measure2.get_average()[0], repeats)
+                repeats = repeats * 2
 
         self.model.train()
 
-        avg_measure = avg_measure.get_average()
 
-        self.writer.add_text(f'{group}/Average Measure/Proposed', str(avg_measure[0]))
-        self.writer.add_text(f'{group}/Average Measure/Reverberant', str(avg_measure[1]))
+
+
         self.writer.close()  # Explicitly close
 
-        print()
-        str_avg_measure = arr2str(avg_measure).replace('\n', '; ')
-        print(f'Average: {str_avg_measure}')
+        ##print()
+        ##str_avg_measure = arr2str(avg_measure).replace('\n', '; ')
+        ##print(f'Average: {str_avg_measure}')

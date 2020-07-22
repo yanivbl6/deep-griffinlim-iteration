@@ -15,6 +15,12 @@ from utils import (EVAL_METRICS,
                    reconstruct_wave,
                    )
 
+from time import time
+
+def ms(stime = None):
+    if stime is None:
+        return int(time() * 1000)
+    return (int(time() * 1000) - stime)
 
 class CustomWriter(SummaryWriter):
     def __init__(self, *args, group='', **kwargs):
@@ -47,8 +53,60 @@ class CustomWriter(SummaryWriter):
         self.y_scale = 1.
 
     def write_one(self, step: int, idx: int = 0,
+                  result_eval_glim= None, reused_sample = None,
                   out: ndarray = None,
                   res: ndarray = None,
+                  suffix: str = None) -> ndarray:
+        """ write summary about one sample of output(and x and y optionally).
+
+        :param step:
+        :param out:
+        :param eval_with_y_ph: determine if `out` is evaluated with `y_phase`
+        :param kwargs: keywords can be [x, y, x_phase, y_phase]
+
+        :return: evaluation result
+        """
+
+        assert out is not None
+        y_wav = reused_sample['y_wav']
+        length = reused_sample['length']
+        out = out.squeeze()
+
+        out_wav = reconstruct_wave(out, n_sample=length)
+        result_eval = self.pool_eval_module.apply_async(
+            calc_using_eval_module,
+            (y_wav, out_wav)
+        )
+
+        if res is not None:
+            if hp.draw_test_fig or self.group == 'train':
+                res = res.squeeze()
+                fig_out = draw_spectrogram(res, **self.kwargs_fig)
+                self.add_figure(f'{self.group}Audio{idx}/{suffix}_output', fig_out, step)
+
+            self.add_audio(f'{self.group}Audio{idx}/3_deGLI_output',
+                        torch.from_numpy(out_wav / self.y_scale),
+                        step,
+                        sample_rate=hp.fs)
+        else:
+            self.add_audio(f'{self.group}Audio{idx}/4_GLA_output',
+                        torch.from_numpy(out_wav / self.y_scale),
+                        step,
+                        sample_rate=hp.fs)
+
+        dict_eval = result_eval.get()
+        if result_eval_glim:
+            self.dict_eval_glim = result_eval_glim.get()
+        # for i, m in enumerate(dict_eval.keys()):
+        #     j = i + 1
+        #     self.add_scalar(f'{self.group}/{j}_{m}/DeGLI{suffix}', dict_eval[m], step)
+
+        return np.array([list(dict_eval.values()),
+                         list(self.dict_eval_glim.values())], dtype=np.float32)
+
+
+
+    def write_zero(self, step: int, idx: int = 0,
                   suffix: str = None,
                   **kwargs: ndarray) -> ndarray:
         """ write summary about one sample of output(and x and y optionally).
@@ -61,54 +119,15 @@ class CustomWriter(SummaryWriter):
         :return: evaluation result
         """
 
-        assert out is not None and res is not None
-        result_eval_glim = self.write_x_y(kwargs, step, idx) if kwargs else None
-        assert self.reused_sample
-        y_wav = self.reused_sample['y_wav']
-        length = self.reused_sample['length']
-        out = out.squeeze()
+        reused_sample, result_eval_glim = self.write_x_y(kwargs, 0, idx) if kwargs else None
 
-        out_wav = reconstruct_wave(out, n_sample=length)
+        # if result_eval_glim:
+        #     self.dict_eval_glim = result_eval_glim.get()
+        #     for i, m in enumerate(self.dict_eval_glim.keys()):
+        #         j = i + 1
+        #         self.add_scalar(f'{self.group}/{j}_{m}/GLim', self.dict_eval_glim[m], 0)
 
-        result_eval = self.pool_eval_module.apply_async(
-            calc_using_eval_module,
-            (y_wav, out_wav)
-        )
-        # dict_eval = calc_using_eval_module(
-        #     y_wav,
-        #     out_wav_y_ph if eval_with_y_ph else out_wav
-        # )
-
-
-        if hp.draw_test_fig or self.group == 'train':
-            res = res.squeeze()
-            fig_out = draw_spectrogram(res, **self.kwargs_fig)
-            self.add_figure(f'{self.group}Audio{idx}/4_DNN_Output_Spectrum', fig_out, step)
-            ##fig_out2 = draw_spectrogram(np.abs(res - diff), **self.kwargs_fig)
-            ##self.add_figure(f'{self.group}Audio{idx}/5_DNN_Output_Diff', fig_out2, step)
-
-
-        self.add_audio(f'{self.group}Audio{idx}/3_DeGLI_output',
-                       torch.from_numpy(out_wav / self.y_scale),
-                       step,
-                       sample_rate=hp.fs)
-
-        if result_eval_glim:
-            self.dict_eval_glim = result_eval_glim.get()
-        dict_eval = result_eval.get()
-        for i, m in enumerate(dict_eval.keys()):
-            j = i + 1
-            self.add_scalar(f'{self.group}/{j}_{m}/GLim', self.dict_eval_glim[m], step)
-            self.add_scalar(f'{self.group}/{j}_{m}/DeGLI{suffix}', dict_eval[m], step)
-
-        return np.array([list(dict_eval.values()),
-                         list(self.dict_eval_glim.values())], dtype=np.float32)
-
-    def getSignals(self, kwargs: Dict[str, ndarray]):
-        x = kwargs['x'].squeeze()
-        y_mag = kwargs['y_mag'].squeeze()
-        y = kwargs['y'].squeeze()
-        return x,y, y_mag
+        return reused_sample, result_eval_glim
 
     def write_x_y(self, kwargs: Dict[str, ndarray], step: int, idx: int) -> mp.pool.AsyncResult:
         # F, T, 1
@@ -119,7 +138,14 @@ class CustomWriter(SummaryWriter):
 
         # T,
         x_wav = reconstruct_wave(x, n_sample=length)
+
+        stime = ms()
         glim_wav = reconstruct_wave(y_mag, np.angle(x), n_iter=hp.n_glim_iter, n_sample=length)
+        etime = ms(stime)
+        speed =  length  / (etime*1000)
+        ##print("GLA, %d iterations, length: %d, time: %d miliseconds, ratio = %.02f" % (hp.n_glim_iter, length , etime, speed))
+        ##self.add_scalar("performance/glaFull%d", speed, hp.n_glim_iter)
+
         glim_mag = np.abs(librosa.stft(glim_wav, **hp.kwargs_stft))
         y_wav = reconstruct_wave(y, n_sample=length)
         self.y_scale = np.abs(y_wav).max() / 0.5
@@ -162,4 +188,4 @@ class CustomWriter(SummaryWriter):
                                   length=length,
                                   )
 
-        return result_eval_glim
+        return self.reused_sample, result_eval_glim

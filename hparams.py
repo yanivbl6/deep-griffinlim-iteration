@@ -57,6 +57,7 @@ class _HyperParameters:
     n_glim_iter: int = 100
     repeat_train: int = 2
     repeat_test: int = 32
+    noisy_init: bool = False
 
     # paths
     # logdir will be converted to type Path in the init_dependent_vars function
