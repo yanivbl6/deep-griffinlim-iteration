@@ -284,8 +284,8 @@ class DeGLI(nn.Module):
             max_length = max_length.item()
 
         out_repeats = []
-        for ii in range(repeat):
-            for dnn in self.dnns:
+        for _ in range(repeat):
+            for _ in self.dnns:
                 # B, 2, F, T
                 mag_replaced = replace_magnitude(x, mag)
 
@@ -294,8 +294,7 @@ class DeGLI(nn.Module):
                 consistent = self.stft(waves)
 
                 # B, 2, F, T
-                consistent = consistent.permute(0, 3, 1, 2)
-                x = consistent
+                x = consistent.permute(0, 3, 1, 2)
             if self.out_all_block:
                 out_repeats.append(x)
 

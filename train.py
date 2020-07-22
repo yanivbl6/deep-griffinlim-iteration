@@ -20,7 +20,8 @@ from tqdm import tqdm
 from dataset import ComplexSpecDataset
 from hparams import hp
 # noinspection PyUnresolvedReferences
-from model import DeGLI
+from model import DeGLI, DeqGLI
+
 from tbwriter import CustomWriter
 from utils import AverageMeter, arr2str, draw_spectrogram, print_to_file
 
@@ -36,8 +37,10 @@ class Trainer:
 
         self.writer: Optional[CustomWriter] = None
 
-        self.model = DeGLI(self.writer, hp.deq_config, **hp.model)
-
+        if not hp.use_deq:
+            self.model = DeGLI(self.writer, hp.deq_config, **hp.model)
+        else:
+            self.model = DeqGLI(self.writer, hp.deq_config, hp.n_freq , **hp.model)
 
         self.module = self.model
         self.criterion = nn.L1Loss(reduction='none')
@@ -285,16 +288,14 @@ class Trainer:
         avg_loss = AverageMeter(float)
 
         pbar = tqdm(loader, desc='validate ', postfix='[0]', dynamic_ncols=True)
-        step = -1
         for i_iter, data in enumerate(pbar):
             # get data
-            step = step + 1
             x, mag, max_length, y = self.preprocess(data)  # B, C, F, T
             T_ys = data['T_ys']
 
             # forward
             output_loss, output, residual = self.model(x, mag, max_length,
-                                                       repeat=repeat, train_step= 1000000 )
+                                                       repeat=repeat, train_step= step )
 
             # loss
             loss = self.calc_loss(output_loss, y, T_ys)
@@ -304,24 +305,24 @@ class Trainer:
             pbar.set_postfix_str(f'{avg_loss.get_average():.1e}')
 
             # write summary
-            if i_iter == 0:
-                # F, T, C
-                if not self.valid_eval_sample:
-                    self.valid_eval_sample = ComplexSpecDataset.decollate_padded(data, 0)
+            # if i_iter == 0:
+            #     # F, T, C
+            #     if not self.valid_eval_sample:
+            #         self.valid_eval_sample = ComplexSpecDataset.decollate_padded(data, 0)
 
-                out_one = self.postprocess(output, residual, T_ys, 0, loader.dataset)
+            #     out_one = self.postprocess(output, residual, T_ys, 0, loader.dataset)
 
-                # ComplexSpecDataset.save_dirspec(
-                #     logdir / hp.form_result.format(epoch),
-                #     **self.valid_eval_sample, **out_one
-                # )
+            #     # ComplexSpecDataset.save_dirspec(
+            #     #     logdir / hp.form_result.format(epoch),
+            #     #     **self.valid_eval_sample, **out_one
+            #     # )
 
-                if not self.writer.reused_sample:
-                    one_sample = self.valid_eval_sample
-                else:
-                    one_sample = dict()
+            #     if not self.writer.reused_sample:
+            #         one_sample = self.valid_eval_sample
+            #     else:
+            #         one_sample = dict()
 
-                self.writer.write_one(epoch, 0 , **one_sample, **out_one, suffix=suffix)
+            #     self.writer.write_one(epoch, 0 , **one_sample, **out_one, suffix=suffix)
 
         self.writer.add_scalar(f'loss/valid{suffix}', avg_loss.get_average(), epoch)
 

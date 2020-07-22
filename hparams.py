@@ -68,8 +68,10 @@ class _HyperParameters:
     sfx_featuredir: str = ''
 
 
-    ## deq parameters
-    use_deq: bool = True
+    use_deqGLI: bool = False
+
+    ## deq_gli parameters
+    use_deq: bool = False
     wnorm=False,
     num_branches: int = 1
     base_channels: int = 16
@@ -77,14 +79,19 @@ class _HyperParameters:
     fuse_method: str = "SUM"
     droprate: float = 0.0
     final_multiplier: int = 2
-    pretrain_steps: int = 500
+    pretrain_steps: int = 10000
     f_thres: int = 24
     b_thres: int = 24
     num_layers: int  = 3
     ch_hidden: int = 16
     k1: int = 11 
     k2: int  = 7 
+
     p2: int = 3
+
+    freq_embedding: int = 256
+
+
 
     # file names
     form_feature: str = '{:04d}_{:+.2f}dB.npz'  # i_speech, snr_db
@@ -118,8 +125,7 @@ class _HyperParameters:
         self.model = dict(n_fft=self.n_fft,
                           hop_length=self.l_hop,
                           depth=2,
-                          out_all_block=True,
-                          use_deq = self.use_deq
+                          out_all_block=True
                           )
 
         self.deq_config = dict( wnorm=False,
@@ -136,7 +142,8 @@ class _HyperParameters:
                                 ch_hidden= self.ch_hidden,
                                 k1 = self.k1, 
                                 k2 = self.k2, 
-                                p2 = self.p2
+                                p2 = self.p2,
+                                freq_embedding = self.freq_embedding
                                 )
 
 
