@@ -84,15 +84,10 @@ class CustomWriter(SummaryWriter):
                 fig_out = draw_spectrogram(res, **self.kwargs_fig)
                 self.add_figure(f'{self.group}Audio{idx}/{suffix}_output', fig_out, step)
 
-            self.add_audio(f'{self.group}Audio{idx}/3_deGLI_output',
-                        torch.from_numpy(out_wav / self.y_scale),
-                        step,
-                        sample_rate=hp.fs)
-        else:
-            self.add_audio(f'{self.group}Audio{idx}/4_GLA_output',
-                        torch.from_numpy(out_wav / self.y_scale),
-                        step,
-                        sample_rate=hp.fs)
+        self.add_audio(f'{self.group}Audio{idx}/{suffix}_output',
+                    torch.from_numpy(out_wav / self.y_scale),
+                    step,
+                    sample_rate=hp.fs)
 
         dict_eval = result_eval.get()
         if result_eval_glim:
@@ -118,7 +113,11 @@ class CustomWriter(SummaryWriter):
 
         :return: evaluation result
         """
-
+        # async_calc_res = self.pool_eval_module.apply_async(
+        #         self.write_x_y,
+        #         (kwargs, 0, idx)
+        # )
+                    
         reused_sample, result_eval_glim = self.write_x_y(kwargs, 0, idx) if kwargs else None
 
         # if result_eval_glim:
@@ -153,6 +152,9 @@ class CustomWriter(SummaryWriter):
             calc_using_eval_module,
             (y_wav, glim_wav)
         )
+
+        ##result_eval_glim = calc_using_eval_module(y_wav, glim_wav)
+
         # result_eval_glim = None
         # self.dict_eval_glim = calc_using_eval_module(y_wav, glim_wav[:y_wav.shape[0]])
 

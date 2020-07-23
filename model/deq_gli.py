@@ -69,6 +69,8 @@ class DeqGLI(nn.Module):
 
         self.init_weights()
 
+        self.window = None
+
     def init_weights(self, pretrained=''):
         """
         Model initialization. If pretrained weights are specified, we load the weights.
@@ -179,43 +181,45 @@ class DeqGLI(nn.Module):
             max_length = max_length.item()
 
         dev = x.device
-        x = torch.cat([mag, x], dim=1)
 
-        x = self.pad0(x)
+        for _ in range(repeat):
+            x = torch.cat([mag, x], dim=1)
 
-        x = self.conv_first(x)
+            x = self.pad0(x)
 
-        x_list = [x]
-        for i in range(1, self.num_branches):
-            bsz, _, H, W = x_list[-1].shape
-            x_list.append(torch.zeros(bsz, self.num_channels[i], H//2, W//2).to(dev))   # ... and the rest are all zeros
+            x = self.conv_first(x)
+
+            x_list = [x]
+            for i in range(1, self.num_branches):
+                bsz, _, H, W = x_list[-1].shape
+                x_list.append(torch.zeros(bsz, self.num_channels[i], H//2, W//2).to(dev))   # ... and the rest are all zeros
+                
+            z_list = [torch.zeros_like(elem) for elem in x_list]
             
-        z_list = [torch.zeros_like(elem) for elem in x_list]
-        
-        # For variational dropout mask resetting and weight normalization re-computations
-        self.fullstage._reset(z_list)
-        self.fullstage_copy._copy(self.fullstage)
-        
-        # Multiscale Deep Equilibrium!
-        if 0 <= train_step < self.pretrain_steps:
-            for layer_ind in range(self.num_layers):
-                z_list = self.fullstage(z_list, x_list)
-        else:
-            if train_step == self.pretrain_steps:
-                torch.cuda.empty_cache()
-            z_list = self.deq(z_list, x_list, threshold=self.f_thres, train_step=train_step, writer=self.writer)
-        y_list = self.iodrop(z_list)
-        y = self.incre_modules[0](y_list[0])
+            # For variational dropout mask resetting and weight normalization re-computations
+            self.fullstage._reset(z_list)
+            self.fullstage_copy._copy(self.fullstage)
+
+            # Multiscale Deep Equilibrium!
+            if 0 <= train_step < self.pretrain_steps:
+                for layer_ind in range(self.num_layers):
+                    z_list = self.fullstage(z_list, x_list)
+            else:
+                if train_step == self.pretrain_steps:
+                    torch.cuda.empty_cache()
+                z_list = self.deq(z_list, x_list, threshold=self.f_thres, train_step=train_step, writer=self.writer)
+            y_list = self.iodrop(z_list)
+            y = self.incre_modules[0](y_list[0])
 
 
 
-        # Classification Head
-        for i in range(len(self.downsamp_modules)):
-            y = self.incre_modules[i+1](y_list[i+1]) + self.downsamp_modules[i](y)
+            # Classification Head
+            for i in range(len(self.downsamp_modules)):
+                y = self.incre_modules[i+1](y_list[i+1]) + self.downsamp_modules[i](y)
 
-        x = self.pad1(y)
+            x = self.pad1(y)
 
-        x = self.conv_last(x)
+            x = self.conv_last(x)
 
         final_out = replace_magnitude(x, mag)
 
@@ -254,3 +258,30 @@ class DeqGLI(nn.Module):
         final_out = replace_magnitude(x, mag)
         return out_repeats, final_out, residual
 
+
+
+
+
+
+    def plain_gla(self, x, mag, max_length=None, repeat=1, train_step = -1):
+
+        if self.window is None: ##allocate on demand. used for testing.
+            self.window = nn.Parameter(torch.hann_window(self.n_fft), requires_grad=False)
+            self.istft = InverseSTFT(self.n_fft, hop_length=self.hop_length, window=self.window.data)
+            self = self.cuda()
+
+        for _ in range(repeat):
+            # B, 2, F, T
+            mag_replaced = replace_magnitude(x, mag)
+
+            # B, F, T, 2
+            waves = self.istft(mag_replaced.permute(0, 2, 3, 1), length=max_length)
+            consistent = torch.stft(waves, n_fft=self.n_fft, hop_length=self.hop_length, window=self.window)
+
+            # B, 2, F, T
+            x = consistent.permute(0, 3, 1, 2)
+
+        out_repeats = x.unsqueeze(1)
+
+        final_out = replace_magnitude(x, mag)
+        return out_repeats, final_out

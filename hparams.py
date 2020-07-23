@@ -55,7 +55,7 @@ class _HyperParameters:
     draw_test_fig: bool = True
     n_save_block_outs: int = 0
     n_glim_iter: int = 100
-    repeat_train: int = 2
+    repeat_train: int = 1
     repeat_test: int = 32
     noisy_init: bool = False
 

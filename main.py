@@ -78,7 +78,8 @@ if args.test:
         foldername_test += '_blockouts'
     logdir_test /= foldername_test
     if logdir_test.exists() and list(logdir_test.glob(tfevents_fname)):
-        ans = input(form_overwrite_msg.format(logdir_test))
+        ##ans = input(form_overwrite_msg.format(logdir_test))
+        ans ='y'
         if ans.lower().startswith('y'):
             shutil.rmtree(logdir_test)
             os.makedirs(logdir_test)

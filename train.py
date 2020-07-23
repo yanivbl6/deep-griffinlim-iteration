@@ -55,7 +55,8 @@ class Trainer:
         #                       )
 
 
-
+        self.reused_sample = None
+        self.result_eval_glim = None
         self.__init_device(hp.device, hp.out_device)
 
         self.scheduler = lr_scheduler.ReduceLROnPlateau(self.optimizer, **hp.scheduler)
@@ -305,7 +306,13 @@ class Trainer:
             pbar.set_postfix_str(f'{avg_loss.get_average():.1e}')
 
             # write summary
-            # if i_iter == 0:
+            if i_iter == 0:
+                if self.reused_sample is None:
+                    one_sample = ComplexSpecDataset.decollate_padded(data, i_iter)
+                    self.reused_sample, self.result_eval_glim = self.writer.write_zero(0, i_iter, **one_sample, suffix="Base stats")
+                    
+                out_one = self.postprocess(output, residual, T_ys, i_iter, loader.dataset)
+                self.writer.write_one(0, i_iter, self.result_eval_glim, self.reused_sample ,**out_one, suffix="deGLI")
             #     # F, T, C
             #     if not self.valid_eval_sample:
             #         self.valid_eval_sample = ComplexSpecDataset.decollate_padded(data, 0)
@@ -395,12 +402,14 @@ class Trainer:
 
             for _ in range(3):
                 _, output, residual = self.model(x, mag, max_length,
-                                                repeat=1) ##warn up!
+                                                repeat=1, train_step = hp.pretrain_steps + 1) ##warn up!
+                _, output = self.model.plain_gla(x, mag, max_length,
+                                                repeat=repeats)
 
             while repeats <= hp.repeat_test:
                 stime = ms()
                 _, output, residual = self.model(x, mag, max_length,
-                                                repeat=repeats)
+                                                repeat=repeats, train_step = hp.pretrain_steps + 1)
                 avg_measure = AverageMeter()
                 avg_measure2 = AverageMeter()
 
@@ -428,7 +437,7 @@ class Trainer:
                     #     **one_sample, **out_one
                     # )
 
-                    measure = self.writer.write_one(repeats, i_b, result_eval_glim, reused_sample ,**out_one, suffix="deGLI")
+                    measure = self.writer.write_one(repeats, i_b, result_eval_glim, reused_sample ,**out_one, suffix="3_deGLI")
 
                     avg_measure.update(measure)
                                         
@@ -448,7 +457,7 @@ class Trainer:
                     reused_sample = sampleItem[0]
                     result_eval_glim = sampleItem[1]
                     out_one = self.postprocess(output, None, T_ys, i_b, loader.dataset)
-                    measure = self.writer.write_one(repeats, i_b, result_eval_glim, reused_sample ,**out_one, suffix="GLI")
+                    measure = self.writer.write_one(repeats, i_b, result_eval_glim, reused_sample ,**out_one, suffix="4_GLA")
                     avg_measure2.update(measure)
 
 
