@@ -38,6 +38,8 @@ from dataset import ComplexSpecDataset
 from hparams import hp
 from train import Trainer
 
+from create_mel import createLin
+
 tfevents_fname = 'events.out.tfevents.*'
 form_overwrite_msg = 'The folder "{}" already has tfevent files. Continue? [y/n]\n'
 
@@ -45,11 +47,12 @@ parser = ArgumentParser()
 
 parser.add_argument('--train', action='store_true')
 parser.add_argument('--test', action='store_true')
+parser.add_argument('--infer', action='store_true')
 parser.add_argument('--from', type=int, default=-1, dest='epoch', metavar='EPOCH')
 
 args = hp.parse_argument(parser)
 del parser
-if not (args.train ^ args.test) or args.epoch < -1:
+if not (args.train ^ args.test ^ args.infer ) or args.epoch < -1:
     raise ArgumentError
 
 # directory
@@ -68,7 +71,6 @@ if (args.train and args.epoch == -1 and
             pass
     else:
         exit()
-os.makedirs(logdir_train, exist_ok=True)
 
 if args.test:
     logdir_test = hp.logdir
@@ -86,6 +88,21 @@ if args.test:
             exit()
     os.makedirs(logdir_test, exist_ok=True)
 
+if args.infer:
+    logdir_infer = hp.logdir
+    foldername_infer = f'infer_{args.epoch}'
+
+    logdir_infer /= foldername_infer
+    if logdir_infer.exists() and list(logdir_infer.glob(tfevents_fname)):
+        ##ans = input(form_overwrite_msg.format(logdir_test))
+        ans ='y'
+        if ans.lower().startswith('y'):
+            shutil.rmtree(logdir_infer)
+            os.makedirs(logdir_infer)
+        else:
+            exit()
+    os.makedirs(logdir_infer, exist_ok=True)
+
 # epoch, state dict
 first_epoch = args.epoch + 1
 if first_epoch > 0:
@@ -102,8 +119,14 @@ dataset_train.set_needs(**hp.channels)
 dataset_valid.set_needs(**hp.channels)
 
 # run
-trainer = Trainer(path_state_dict)
-num_workers = trainer.num_workers
+if args.infer and path_state_dict is None:
+    trainer = None
+    num_workers = 1
+else:
+    os.makedirs(logdir_train, exist_ok=True)
+    trainer = Trainer(path_state_dict)
+    num_workers = trainer.num_workers
+    
 if args.train:
     
     loader_train = DataLoader(dataset_train,
@@ -124,12 +147,12 @@ if args.train:
                               )
 
     trainer.train(loader_train, loader_valid, logdir_train, first_epoch)
-else:  # args.test
+elif args.test: 
     # Test Set
     dataset_test = ComplexSpecDataset('test')
     loader = DataLoader(dataset_test,
                         batch_size=hp.batch_size * 2,
-                        num_workers=hp.num_workers,
+                        num_workers=num_workers,
                         collate_fn=dataset_test.pad_collate,
                         pin_memory=(hp.device != 'cpu'),
                         shuffle=False,
@@ -137,3 +160,43 @@ else:  # args.test
 
     # noinspection PyUnboundLocalVariable
     trainer.test(loader, logdir_test)
+elif args.infer: 
+    # Train Set
+    dataset = ComplexSpecDataset('train')
+    loader = DataLoader(dataset,
+                        batch_size=hp.batch_size * 2,
+                        num_workers=num_workers,
+                        collate_fn=dataset.pad_collate,
+                        pin_memory=(hp.device != 'cpu'),
+                        shuffle=False,
+                        )
+
+    logdir_infer_train = logdir_infer / "TRAIN" 
+    os.makedirs(logdir_infer_train, exist_ok=True)
+
+    if trainer is not None:
+        trainer.infer(loader, logdir_infer_train)
+    else:
+        createLin(loader, logdir_infer_train, hp.num_snr)
+    # Test Set
+    dataset = ComplexSpecDataset('test')
+    loader = DataLoader(dataset,
+                        batch_size=hp.batch_size * 2,
+                        num_workers=num_workers,
+                        collate_fn=dataset.pad_collate,
+                        pin_memory=(hp.device != 'cpu'),
+                        shuffle=False,
+                        )
+
+    hp.num_snr = 1
+    logdir_infer_test = logdir_infer / "TEST" 
+    os.makedirs(logdir_infer_test, exist_ok=True)
+
+    if trainer is not None:
+        trainer.infer(loader, logdir_infer_test)
+    else:
+        createLin(loader, logdir_infer_test, 1)
+
+
+else:
+    print("Must use --train, --test or --infer")

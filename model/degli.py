@@ -232,7 +232,7 @@ def replace_magnitude(x, mag):
 
 
 class DeGLI(nn.Module):
-    def __init__(self, writer, dedeq_config , n_fft: int, hop_length: int, depth:int, out_all_block:bool, use_deq: bool):
+    def __init__(self, writer, dedeq_config , n_fft: int, hop_length: int, depth:int, out_all_block:bool):
         super().__init__()
         self.n_fft = n_fft
         self.hop_length = hop_length
@@ -241,10 +241,7 @@ class DeGLI(nn.Module):
         self.window = nn.Parameter(torch.hann_window(n_fft), requires_grad=False)
         self.istft = InverseSTFT(n_fft, hop_length=self.hop_length, window=self.window.data)
 
-        if not use_deq:
-            self.dnns = nn.ModuleList([DeGLI_DNN() for _ in range(depth)])
-        else:
-            self.dnns = nn.ModuleList([DeGLI_DEQ(writer = writer, **dedeq_config) for _ in range(depth)])
+        self.dnns = nn.ModuleList([DeGLI_DNN() for _ in range(depth)])
 
     def stft(self, x):
         return torch.stft(x, n_fft=self.n_fft, hop_length=self.hop_length, window=self.window)

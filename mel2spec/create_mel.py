@@ -10,7 +10,9 @@ from tqdm import tqdm
 import torch
 
 import sys
+from pathlib import Path
 
+from torch.utils.data import DataLoader
 
 from hparams import hp
 
@@ -49,6 +51,63 @@ def save_feature(stft, i_speech: int, s_path_speech: str, speech: ndarray) -> tu
                  )
         
     return mdict
+
+def createLin(loader: DataLoader, logdir: Path, num_snr:int ):
+    """ Evaluate the performance of the model.
+
+    :param loader: DataLoader to use.
+    :param logdir: path of the result files.
+    :param epoch:
+    """
+
+    def save_feature(num_snr, i_speech: int, s_path_speech: str, speech: ndarray) -> tuple:
+        spec_clean = np.ascontiguousarray(librosa.stft(speech, **hp.kwargs_stft))
+        mag_clean = np.ascontiguousarray(np.abs(spec_clean)[..., np.newaxis])
+
+        signal_power = np.mean(np.abs(speech)**2)
+        list_dict = []
+        list_snr_db = []
+        for _ in enumerate(range(num_snr)):
+            snr_db = -6*np.random.rand()
+            list_snr_db.append(snr_db)
+            snr = librosa.db_to_power(snr_db)
+            noise_power = signal_power / snr
+            noisy = speech + np.sqrt(noise_power) * np.random.randn(len(speech))
+            spec_noisy = librosa.stft(noisy, **hp.kwargs_stft)
+            spec_noisy = np.ascontiguousarray(spec_noisy)
+
+            list_dict.append(
+                dict(spec_noisy=spec_noisy,
+                    spec_clean=spec_clean,
+                    mag_clean=mag_clean,
+                    path_speech=s_path_speech,
+                    length=len(speech),
+                    )
+            )
+        return list_snr_db, list_dict
+
+    os.makedirs(Path(logdir), exist_ok=True)
+
+    cnt = 0
+
+    pbar = tqdm(loader, desc='mel2create', postfix='[0]', dynamic_ncols=True)
+
+    form= '{:05d}_mel2spec_{:+.2f}dB.npz' 
+    for data in pbar:
+        paths = data['path_speech']
+
+        for p in range(len(paths)):
+            path_speech= paths[p]
+
+            speech = sf.read(str(path_speech))[0].astype(np.float32)
+
+            list_snr_db, list_dict = save_feature(num_snr, cnt, str(path_speech), speech)
+            cnt = cnt + 1
+            for snr_db, dict_result in zip(list_snr_db, list_dict):
+                np.savez(logdir / form.format(cnt, snr_db),
+                        **dict_result,
+                        )
+    return 
 
 
 if __name__ == "__main__":

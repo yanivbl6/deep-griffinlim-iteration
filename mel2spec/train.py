@@ -21,6 +21,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 
+import soundfile as sf
 
 
 from dataset import ComplexSpecDataset
@@ -30,7 +31,7 @@ import sys
 sys.path.insert(0, '../')
 from hparams import hp
 from tbwriter import CustomWriter
-from utils import AverageMeter, arr2str, draw_spectrogram, print_to_file
+from utils import AverageMeter, arr2str, draw_spectrogram, print_to_file, calc_using_eval_module
 
 from time import time
 
@@ -476,8 +477,6 @@ class Trainer:
             loss1 = self.calc_loss(x, y, T_ys, self.criterion)
             lozz1 = self.calc_loss(z, y, T_ys, self.criterion)
 
-
-
             loss2 = self.calc_loss(x_mel, y_mel, T_ys, self.criterion2)
             lozz2 = self.calc_loss(z_mel, x_mel, T_ys, self.criterion2)
 
@@ -511,8 +510,6 @@ class Trainer:
                 z = z[0,0,:,:T_ys[0]].cpu()
 
                 ##import pdb; pdb.set_trace()
-
-
 
                 if i_iter == 3:
                     ymin = y[y > 0].min()
@@ -577,8 +574,229 @@ class Trainer:
 
         return avg_loss1.get_average()
 
+    def calc_stoi(self, y_wav, audio):
 
+        audio_len = min(y_wav.shape[0], audio.shape[0]  )
+        measure = calc_using_eval_module(y_wav[:audio_len], audio[:audio_len,0,0])
+        return measure['STOI']
 
     @torch.no_grad()
     def test(self, loader: DataLoader, logdir: Path):
-        return None
+        """ Evaluate the performance of the model.
+
+        :param loader: DataLoader to use.
+        :param logdir: path of the result files.
+        :param epoch:
+        """
+        self.model.eval()
+
+        os.makedirs(Path(logdir), exist_ok=True)
+        self.writer = CustomWriter(str(logdir), group='test')
+
+        ##import pdb; pdb.set_trace()
+        num_filters = len(self.filters)
+
+        avg_loss1 = AverageMeter(float)
+        avg_lozz1 = AverageMeter(float)
+        avg_loss2 = AverageMeter(float)
+        avg_lozz2 = AverageMeter(float)
+
+        avg_loss_tot = AverageMeter(float)
+        avg_losses = [AverageMeter(float) for _ in range(num_filters) ]
+        losses = [None] * num_filters
+
+        cnt = 0
+        for i_iter, data in enumerate(loader):
+
+            ##import pdb; pdb.set_trace()
+            x_mel, y = self.preprocess(data)  # B, C, F, T
+            x_mel = self.model.spec_to_mel(y) 
+
+            z = self.model.mel_pseudo_inverse(x_mel)
+
+            T_ys = data['T_ys']
+            paths = data['path_speech']
+            x = self.model(x_mel)  # B, C, F, T
+            y_mel = self.model.spec_to_mel(x)     
+            z_mel = self.model.spec_to_mel(y)
+
+            loss1 = self.calc_loss(x, y, T_ys, self.criterion)
+            lozz1 = self.calc_loss(z, y, T_ys, self.criterion)
+
+            loss2 = self.calc_loss(x_mel, y_mel, T_ys, self.criterion2)
+            lozz2 = self.calc_loss(z_mel, x_mel, T_ys, self.criterion2)
+
+            loss = loss1 + loss2*hp.l2_factor
+
+            # for i,f in enumerate(self.filters):
+            #     s = self.f_specs[i][1]
+            #     losses[i] = self.calc_loss_smooth(x,y,T_ys,f, s )
+            #     loss = loss + losses[i]
+
+            for i,(k,s) in enumerate(self.f_specs):
+                losses[i] = self.calc_loss_smooth2(x,y,T_ys,k, s )
+                loss = loss + losses[i]
+
+            avg_loss1.update(loss1.item(), len(T_ys))
+            avg_lozz1.update(lozz1.item(), len(T_ys))
+            avg_loss2.update(loss2.item(), len(T_ys))
+            avg_lozz2.update(lozz2.item(), len(T_ys))
+            avg_loss_tot.update(loss.item(), len(T_ys))
+
+            for j,l in enumerate(losses):
+                avg_losses[j].update(l.item(), len(T_ys))
+
+            # print
+            ##pbar.set_postfix_str(f'{avg_loss1.get_average():.1e}')
+
+            # write summary
+
+            pbar = tqdm(range(len(T_ys)), desc='validate_bath', postfix='[0]', dynamic_ncols=True)
+
+            for p in pbar:
+                _x = x[p,0,:,:T_ys[p]].cpu()
+                _y = y[p,0,:,:T_ys[p]].cpu()
+                _z = z[p,0,:,:T_ys[p]].cpu()
+                path_speech = paths[p]
+
+                ymin = _y[_y > 0].min()
+                vmin, vmax = librosa.amplitude_to_db(np.array((ymin, _y.max())))
+                kwargs_fig = dict(vmin=vmin, vmax=vmax)
+
+
+                if hp.request_drawings:
+                    fig_x = draw_spectrogram(_x, **kwargs_fig)
+                    self.writer.add_figure(f'Audio/1_DNN_Output', fig_x, cnt)
+                    fig_y = draw_spectrogram(_y, **kwargs_fig)
+                    fig_z = draw_spectrogram(_z, **kwargs_fig)
+                    self.writer.add_figure(f'Audio/0_Pseudo_Inverse', fig_z, cnt)
+                    self.writer.add_figure(f'Audio/2_Real_Spectrogram', fig_y, cnt)
+
+                audio_x = self.audio_from_mag_spec(np.abs(_x.numpy()))
+                x_scale = np.abs(audio_x).max() / 0.5
+
+                self.writer.add_audio(f'LWS/1_DNN_Output',
+                            torch.from_numpy(audio_x / x_scale),
+                            cnt,
+                            sample_rate=hp.fs)
+
+                audio_y = self.audio_from_mag_spec(_y.numpy())
+                audio_z = self.audio_from_mag_spec(_z.numpy())
+                
+                z_scale = np.abs(audio_z).max() / 0.5
+                y_scale = np.abs(audio_y).max() / 0.5
+
+                self.writer.add_audio(f'LWS/0_Pseudo_Inverse',
+                            torch.from_numpy(audio_z / z_scale),
+                            cnt,
+                            sample_rate=hp.fs)
+
+
+                self.writer.add_audio(f'LWS/2_Real_Spectrogram',
+                            torch.from_numpy(audio_y / y_scale),
+                            cnt,
+                            sample_rate=hp.fs)
+
+                ##import pdb; pdb.set_trace()
+
+                y_wav =  sf.read(str(path_speech))[0].astype(np.float32)
+                stoi_scores = {'0_Pseudo_Inverse'       : self.calc_stoi(y_wav, audio_z),
+                               '1_DNN_Output'           : self.calc_stoi(y_wav, audio_x),
+                               '2_Real_Spectrogram'     : self.calc_stoi(y_wav, audio_y)}
+
+                self.writer.add_scalars(f'LWS/STOI', stoi_scores, cnt )
+                # self.writer.add_scalar(f'STOI/0_Pseudo_Inverse_LWS', self.calc_stoi(y_wav, audio_z) , cnt)
+                # self.writer.add_scalar(f'STOI/1_DNN_Output_LWS', self.calc_stoi(y_wav, audio_x) , cnt)
+                # self.writer.add_scalar(f'STOI/2_Real_Spectrogram_LWS', self.calc_stoi(y_wav, audio_y) , cnt)
+                cnt = cnt + 1
+
+        # self.writer.add_scalar(f'valid/loss', avg_loss1.get_average(), epoch)
+        # self.writer.add_scalar(f'valid/baseline', avg_lozz1.get_average(), epoch)
+        # self.writer.add_scalar(f'valid/melinv_loss', avg_loss2.get_average(), epoch)
+        # self.writer.add_scalar(f'valid/melinv_baseline', avg_lozz2.get_average(), epoch)
+
+        # for j, avg_loss in enumerate(avg_losses):
+        #     k = self.f_specs[j][0]
+        #     s = self.f_specs[j][1]
+        #     self.writer.add_scalar(f'valid/losses_{k}_{s}', avg_loss.get_average(), epoch)
+        # self.writer.add_scalar('valid/loss_total', avg_loss_tot.get_average(), epoch)
+
+        self.model.train()
+
+        return 
+
+
+
+
+    @torch.no_grad()
+    def infer(self, loader: DataLoader, logdir: Path):
+        """ Evaluate the performance of the model.
+
+        :param loader: DataLoader to use.
+        :param logdir: path of the result files.
+        :param epoch:
+        """
+
+        def save_feature(num_snr :int, i_speech: int, s_path_speech: str, speech: ndarray, mag_mel2spec) -> tuple:
+            spec_clean = np.ascontiguousarray(librosa.stft(speech, **hp.kwargs_stft))
+            signal_power = np.mean(np.abs(speech)**2)
+            list_dict = []
+            list_snr_db = []
+            for _ in enumerate(num_snr):
+                snr_db = -6*np.random.rand()
+                list_snr_db.append(snr_db)
+                snr = librosa.db_to_power(snr_db)
+                noise_power = signal_power / snr
+                noisy = speech + np.sqrt(noise_power) * np.random.randn(len(speech))
+                spec_noisy = librosa.stft(noisy, **hp.kwargs_stft)
+                spec_noisy = np.ascontiguousarray(spec_noisy)
+
+                list_dict.append(
+                    dict(spec_noisy=spec_noisy,
+                        spec_clean=spec_clean,
+                        mag_clean=mag_mel2spec,
+                        path_speech=s_path_speech,
+                        length=len(speech),
+                        )
+                )
+            return list_snr_db, list_dict
+
+
+        self.model.eval()
+
+        os.makedirs(Path(logdir), exist_ok=True)
+
+        ##import pdb; pdb.set_trace()
+        num_filters = len(self.filters)
+
+        cnt = 0
+
+        pbar = tqdm(loader, desc='mel2inference', postfix='[0]', dynamic_ncols=True)
+
+        form= '{:05d}_mel2spec_{:+.2f}dB.npz' 
+        num_snr = range(hp.num_snr) 
+        for i_iter, data in enumerate(pbar):
+
+            ##import pdb; pdb.set_trace()
+            x_mel, y = self.preprocess(data)  # B, C, F, T
+            x_mel = self.model.spec_to_mel(y) 
+
+            T_ys = data['T_ys']
+            paths = data['path_speech']
+            x = self.model(x_mel)  # B, C, F, T
+
+            for p in range(len(T_ys)):
+                _x = x[p,0,:,:T_ys[p]].cpu()
+                path_speech= paths[p]
+
+                speech = sf.read(str(path_speech))[0].astype(np.float32)
+
+                list_snr_db, list_dict = save_feature(num_snr, cnt, str(path_speech), speech, _x)
+                cnt = cnt + 1
+                for snr_db, dict_result in zip(list_snr_db, list_dict):
+                    np.savez(logdir / form.format(cnt, snr_db),
+                            **dict_result,
+                            )
+        self.model.train()
+
+        return 

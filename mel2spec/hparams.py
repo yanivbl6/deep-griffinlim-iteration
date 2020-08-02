@@ -77,6 +77,9 @@ class _HyperParameters:
     thr_clip_grad: float = 4.
     weight_decay: float = 1e-3  # Adam weight_decay
 
+    # testing
+    request_drawings: bool = False
+
     # summary
     period_save_state: int = 1
     draw_test_fig: bool = True
@@ -91,7 +94,7 @@ class _HyperParameters:
     logdir: str = f'/result/mel2spec'
     path_speech: Path = Path('/data/TIMIT')
     path_mel: Path = Path('./data')
-    path_feature: Path = Path('./features')
+    path_features: Path = Path('./features')
     sfx_featuredir: str = ''
 
 
