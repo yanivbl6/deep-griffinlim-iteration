@@ -738,8 +738,11 @@ class Trainer:
         """
 
         def save_feature(num_snr :int, i_speech: int, s_path_speech: str, speech: ndarray, mag_mel2spec) -> tuple:
+
+            ##import pdb; pdb.set_trace()
             spec_clean = np.ascontiguousarray(librosa.stft(speech, **hp.kwargs_stft))
             signal_power = np.mean(np.abs(speech)**2)
+
             list_dict = []
             list_snr_db = []
             for _ in enumerate(num_snr):
@@ -767,8 +770,6 @@ class Trainer:
         os.makedirs(Path(logdir), exist_ok=True)
 
         ##import pdb; pdb.set_trace()
-        num_filters = len(self.filters)
-
         cnt = 0
 
         pbar = tqdm(loader, desc='mel2inference', postfix='[0]', dynamic_ncols=True)
@@ -786,7 +787,8 @@ class Trainer:
             x = self.model(x_mel)  # B, C, F, T
 
             for p in range(len(T_ys)):
-                _x = x[p,0,:,:T_ys[p]].cpu()
+                _x = x[p,0,:,:T_ys[p]].unsqueeze(2).cpu().numpy()
+
                 path_speech= paths[p]
 
                 speech = sf.read(str(path_speech))[0].astype(np.float32)

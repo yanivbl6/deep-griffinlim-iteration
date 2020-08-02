@@ -65,7 +65,7 @@ class _HyperParameters:
     draw_test_fig: bool = True
     n_save_block_outs: int = 0
     n_glim_iter: int = 100
-    repeat_train: int = 1
+    repeat_train: int = 2
     repeat_test: int = 32
     noisy_init: bool = False
 
@@ -191,11 +191,11 @@ class _HyperParameters:
 
         # path
         self.dict_path = dict(
-            speech_train=self.path_speech / 'TRAIN',
-            speech_test=self.path_speech / 'TEST',
+            speech_train=Path(self.path_speech) / 'TRAIN',
+            speech_test=Path(self.path_speech) / 'TEST',
 
-            feature_train=self.path_feature / 'TRAIN',
-            feature_test=self.path_feature / 'TEST',
+            feature_train=Path(self.path_feature) / 'TRAIN',
+            feature_test=Path(self.path_feature) / 'TEST',
 
             # normconst_train=path_feature_train / 'normconst.npz',
 
