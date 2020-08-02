@@ -19,9 +19,7 @@ class Channel(Enum):
 @dataclass
 class _HyperParameters:
     # devices
-    device: Union[int, str, Sequence[str], Sequence[int]] = (0, 1, 2, 3)
-    out_device: Union[int, str] = 2
-    num_workers: int = 4
+    device: Union[int, str, Sequence[str], Sequence[int]] = 'all'
 
     # select dataset
     # feature: str = 'IV'
@@ -38,6 +36,7 @@ class _HyperParameters:
     n_fft: int = 512
     l_frame: int = 512
     n_freq: int = 257
+    mel_freq: int = 80
     l_hop: int = 256
     num_snr: int = 3
 
@@ -50,6 +49,24 @@ class _HyperParameters:
     mel_fmax: float = 8000.0
     max_wav_value: float = 32768.0
 
+
+    #model
+
+    layers: int = 8
+    use_bn: bool = False
+    audio_fs: int = 22050
+    subseq_len: int = 256
+    ngf: int  = 64
+    ndf: int = 64
+    separable_conv: bool = False
+    use_batchnorm: bool = False
+    lamb: float = 0.2
+    droprate: float = 0.1
+    num_dropout: int = 3
+
+    #loss
+    crit: str = "l1"
+    l2_factor: float  = 1.0
 
     # training
     n_data: int = 0  # <=0 to use all data
@@ -71,36 +88,12 @@ class _HyperParameters:
 
     # paths
     # logdir will be converted to type Path in the init_dependent_vars function
-    logdir: str = f'/result/deq3'
+    logdir: str = f'/result/mel2spec'
     path_speech: Path = Path('/data/TIMIT')
-    path_feature: Path = Path('/data')
     path_mel: Path = Path('./data')
-    # path_feature: Path = Path('./backup')
+    path_feature: Path = Path('./features')
     sfx_featuredir: str = ''
 
-
-    use_deqGLI: bool = False
-
-    ## deq_gli parameters
-    use_deq: bool = False
-    wnorm=False,
-    num_branches: int = 1
-    base_channels: int = 16
-    ratio2head: int = 2
-    fuse_method: str = "SUM"
-    droprate: float = 0.0
-    final_multiplier: int = 2
-    pretrain_steps: int = 10000
-    f_thres: int = 24
-    b_thres: int = 24
-    num_layers: int  = 3
-    ch_hidden: int = 16
-    k1: int = 11 
-    k2: int  = 7 
-
-    p2: int = 3
-
-    freq_embedding: int = 256
 
 
 
@@ -115,7 +108,7 @@ class _HyperParameters:
     scheduler: Dict[str, Any] = field(init=False)
     spec_data_names: Dict[str, str] = field(init=False)
 
-    deq_config: Dict[str, Any] = field(init=False)
+    mel_generator: Dict[str, Any] = field(init=False)
 
 
     # dependent variables
@@ -129,7 +122,6 @@ class _HyperParameters:
         self.channels = dict(path_speech=Channel.NONE,
                              x=Channel.ALL,
                              y=Channel.ALL,
-                             y_mag=Channel.ALL,
                              length=Channel.ALL,
                              )
 
@@ -139,24 +131,17 @@ class _HyperParameters:
                           out_all_block=True
                           )
 
-        self.deq_config = dict( wnorm=False,
-                                num_branches = self.num_branches,
-                                base_channels = self.base_channels,
-                                ratio2head = self.ratio2head,
-                                fuse_method = self.fuse_method,
+        self.mel_generator = dict( layers=self.layers,
+                                audio_fs = self.audio_fs,
+                                subseq_len = self.subseq_len,
+                                ngf = self.ngf,
+                                ndf = self.ndf,
+                                separable_conv = self.separable_conv,
+                                use_batchnorm = self.use_batchnorm,
+                                lamb = self.lamb,
                                 droprate = self.droprate,
-                                final_multiplier = self.final_multiplier,
-                                pretrain_steps = self.pretrain_steps,
-                                f_thres = self.f_thres,
-                                b_thres = self.b_thres,
-                                num_layers  = self.num_layers,
-                                ch_hidden= self.ch_hidden,
-                                k1 = self.k1, 
-                                k2 = self.k2, 
-                                p2 = self.p2,
-                                freq_embedding = self.freq_embedding
+                                num_dropout = self.num_dropout
                                 )
-
 
         self.scheduler = dict(mode='min',
                               factor=0.6,
@@ -177,6 +162,13 @@ class _HyperParameters:
                                     res='spec_dnn_output',
                                     )
 
+        self.mel2spec_data_names = dict(x='mel_mag_clean', y='mag_clean',
+                                    path_speech='path_speech',
+                                    length='length',
+                                    out='spec_estimated',
+                                    res='spec_dnn_output',
+                                    )
+
     def init_dependent_vars(self):
         self.logdir = Path(self.logdir)
 
@@ -191,11 +183,11 @@ class _HyperParameters:
 
         # path
         self.dict_path = dict(
-            speech_train=self.path_speech / 'TRAIN',
-            speech_test=self.path_speech / 'TEST',
+            wav_path= Path(self.path_speech),
+            mel_train=self.path_mel / 'TRAIN',
+            mel_test=self.path_mel / 'TEST',
+            path_features=Path(self.path_features),
 
-            feature_train=self.path_feature / 'TRAIN',
-            feature_test=self.path_feature / 'TEST',
 
             # normconst_train=path_feature_train / 'normconst.npz',
 
