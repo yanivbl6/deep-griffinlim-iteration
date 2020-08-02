@@ -61,8 +61,8 @@ class _HyperParameters:
     weight_decay: float = 1e-3  # Adam weight_decay
 
     # summary
-    period_save_state: int = 1
-    draw_test_fig: bool = True
+    period_save_state: int = 5
+    draw_test_fig: bool = False
     n_save_block_outs: int = 0
     n_glim_iter: int = 100
     repeat_train: int = 2
