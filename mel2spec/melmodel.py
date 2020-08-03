@@ -99,6 +99,10 @@ class melGen(nn.Module):
         init_alpha = 0.001
         self.linear_finalizer = nn.Parameter(torch.ones(n_freq) * init_alpha , requires_grad = True)
     
+        if self.pre_final_lin:
+            self.linear_pre_final = nn.Parameter(torch.ones(self.ngf*2, n_freq//2) , requires_grad = True)
+
+
     def mel_pseudo_inverse(self,x):
         return torch.tensordot(x,self.meltrans_inv, dims=[[2],[0]]).permute(0,1,3,2)
 
@@ -129,6 +133,9 @@ class melGen(nn.Module):
             # print(x.shape)
             x = torch.cat([x, encoders_output[-(i+2)]], dim=1)
 
+        if self.pre_final_lin:
+            x_perm = x.permute(0,3,1,2)
+            x = torch.mul(x_perm,  self.linear_pre_final).permute(0,2,3,1)
 
         x = self.decoders[-1](x) 
         ##x = torch.tensordot(x, self.linear_finalizer, dims = [[2] ,[0]]).permute(0,1,3,2)
@@ -172,7 +179,7 @@ class melGen(nn.Module):
 
         return conv
 
-    def parse(self, writer, layers:int, audio_fs:int , subseq_len:int, ngf:int, ndf:int, separable_conv:bool, use_batchnorm:bool, lamb:float, droprate:float,  num_dropout:int):
+    def parse(self, writer, layers:int, audio_fs:int , subseq_len:int, ngf:int, ndf:int, separable_conv:bool, use_batchnorm:bool, lamb:float, droprate:float,  num_dropout:int, pre_final_lin: bool):
         self.writer = writer
         self.n_layers = layers
         self.audio_fs = audio_fs
@@ -184,6 +191,6 @@ class melGen(nn.Module):
         self.lamb = lamb
         self.droprate = droprate
         self.num_dropout = num_dropout
-
+        self.pre_final_lin = pre_final_lin
 
 

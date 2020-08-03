@@ -449,6 +449,7 @@ class Trainer:
         self.model.eval()
 
         num_filters = len(self.filters)
+        avg_stoi = AverageMeter(float)
 
         avg_loss1 = AverageMeter(float)
         avg_lozz1 = AverageMeter(float)
@@ -469,6 +470,7 @@ class Trainer:
             z = self.model.mel_pseudo_inverse(x_mel)
 
             T_ys = data['T_ys']
+            paths = data['path_speech']
 
             x = self.model(x_mel)  # B, C, F, T
             y_mel = self.model.spec_to_mel(x)     
@@ -503,6 +505,21 @@ class Trainer:
             # print
             pbar.set_postfix_str(f'{avg_loss1.get_average():.1e}')
 
+            ## STOI evaluation with LWS
+            if i_iter < hp.num_stoi: 
+                _x = x[0,0,:,:T_ys[0]].cpu()
+                _y = y[0,0,:,:T_ys[0]].cpu()
+                _z = z[0,0,:,:T_ys[0]].cpu()
+                audio_x = self.audio_from_mag_spec(np.abs(_x.numpy()))
+                path_speech = paths[0]
+
+                y_wav =  sf.read(str(path_speech))[0].astype(np.float32)
+                avg_stoi.update(self.calc_stoi(y_wav, audio_x))
+
+
+
+
+
             # write summary
             if i_iter < 4:
                 x = x[0,0,:,:T_ys[0]].cpu()
@@ -511,7 +528,7 @@ class Trainer:
 
                 ##import pdb; pdb.set_trace()
 
-                if i_iter == 3:
+                if i_iter == 3 and hp.request_drawings:
                     ymin = y[y > 0].min()
                     vmin, vmax = librosa.amplitude_to_db(np.array((ymin, y.max())))
                     kwargs_fig = dict(vmin=vmin, vmax=vmax)
@@ -559,10 +576,14 @@ class Trainer:
                                     sample_rate=hp.fs)
 
 
+
+
+
         self.writer.add_scalar(f'valid/loss', avg_loss1.get_average(), epoch)
         self.writer.add_scalar(f'valid/baseline', avg_lozz1.get_average(), epoch)
         self.writer.add_scalar(f'valid/melinv_loss', avg_loss2.get_average(), epoch)
         self.writer.add_scalar(f'valid/melinv_baseline', avg_lozz2.get_average(), epoch)
+        self.writer.add_scalar(f'valid/STOI', avg_stoi.get_average(), epoch )
 
         for j, avg_loss in enumerate(avg_losses):
             k = self.f_specs[j][0]

@@ -129,7 +129,7 @@ if args.train:
     dataset_valid = ComplexSpecDataset('valid')
 
     dataset_train.set_needs(**hp.channels)
-    dataset_valid.set_needs(**hp.channels)
+    ##dataset_valid.set_needs(**hp.channels)
     loader_train = DataLoader(dataset_train,
                               batch_size=hp.batch_size,
                               num_workers=num_workers,

@@ -63,6 +63,10 @@ class _HyperParameters:
     lamb: float = 0.2
     droprate: float = 0.1
     num_dropout: int = 3
+    pre_final_lin: bool = False
+
+    ## validation
+    num_stoi: int = 100
 
     #loss
     crit: str = "l1"
@@ -145,7 +149,8 @@ class _HyperParameters:
                                 use_batchnorm = self.use_batchnorm,
                                 lamb = self.lamb,
                                 droprate = self.droprate,
-                                num_dropout = self.num_dropout
+                                num_dropout = self.num_dropout,
+                                pre_final_lin = self.pre_final_lin
                                 )
 
         self.scheduler = dict(mode='min',
