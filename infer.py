@@ -39,6 +39,9 @@ if args.list:
             continue
         checkpoints = []
         full_path_train = "%s/train" % full_path
+
+        if not os.path.exists(full_path_train):  
+            continue
         for e in listdir(full_path_train):
             if e.__str__()[-2:] == "pt":
                 checkpoints.append(int(e.split('.')[0]))

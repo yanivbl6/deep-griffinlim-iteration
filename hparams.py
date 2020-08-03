@@ -195,9 +195,10 @@ class _HyperParameters:
         self.dict_path = dict(
             speech_train=Path(self.path_speech) / 'TRAIN',
             speech_test=Path(self.path_speech) / 'TEST',
-
+            speech_valid=Path(self.path_speech) / 'VALID',
             feature_train=Path(self.path_feature) / 'TRAIN',
             feature_test=Path(self.path_feature) / 'TEST',
+            feature_valid=Path(self.path_feature) / 'VALID',
 
             # normconst_train=path_feature_train / 'normconst.npz',
 
