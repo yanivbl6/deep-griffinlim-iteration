@@ -38,7 +38,7 @@ class _HyperParameters:
     n_freq: int = 257
     mel_freq: int = 80
     l_hop: int = 256
-    num_snr: int = 3
+    num_snr: int = 1
 
 
     use_mel: bool = True
@@ -120,6 +120,8 @@ class _HyperParameters:
     kwargs_stft: Dict[str, Any] = None
     kwargs_istft: Dict[str, Any] = None
 
+    #inference
+    infer_all: bool = False
 
     def __post_init__(self):
         self.channels = dict(path_speech=Channel.NONE,
@@ -189,6 +191,7 @@ class _HyperParameters:
             wav_path= Path(self.path_speech),
             mel_train=self.path_mel / 'TRAIN',
             mel_test=self.path_mel / 'TEST',
+            mel_valid=self.path_mel / 'VALID',
             path_features=Path(self.path_features),
 
 

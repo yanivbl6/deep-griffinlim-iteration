@@ -101,15 +101,18 @@ if first_epoch > 0:
 else:
     path_state_dict = None
 
-# Training + Validation Set
-dataset_temp = ComplexSpecDataset('train')
-dataset_train, dataset_valid = ComplexSpecDataset.split(dataset_temp, (hp.train_ratio, -1))
-dataset_train.set_needs(**hp.channels)
-dataset_valid.set_needs(**hp.channels)
+
 
 # run
 trainer = Trainer(path_state_dict)
 if args.train:
+
+    # Training + Validation Set
+    dataset_train = ComplexSpecDataset('train')
+    dataset_valid = ComplexSpecDataset('valid')
+    dataset_train.set_needs(**hp.channels)
+    dataset_valid.set_needs(**hp.channels)
+
     loader_train = DataLoader(dataset_train,
                               batch_size=hp.batch_size,
                               num_workers=hp.num_workers,
@@ -131,6 +134,7 @@ if args.train:
 else:  # args.test
     # Test Set
     if hp.speed_test:
+        dataset_valid = ComplexSpecDataset('valid')
         loader_valid = DataLoader(dataset_valid,
                                 batch_size=hp.batch_size * 2,
                                 num_workers=hp.num_workers,

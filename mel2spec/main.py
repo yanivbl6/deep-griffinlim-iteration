@@ -113,10 +113,7 @@ else:
     path_state_dict = None
 
 # Training + Validation Set
-dataset_temp = ComplexSpecDataset('train')
-dataset_train, dataset_valid = ComplexSpecDataset.split(dataset_temp, (hp.train_ratio, -1))
-dataset_train.set_needs(**hp.channels)
-dataset_valid.set_needs(**hp.channels)
+
 
 # run
 if args.infer and path_state_dict is None:
@@ -128,7 +125,11 @@ else:
     num_workers = trainer.num_workers
     
 if args.train:
-    
+    dataset_train = ComplexSpecDataset('train')
+    dataset_valid = ComplexSpecDataset('valid')
+
+    dataset_train.set_needs(**hp.channels)
+    dataset_valid.set_needs(**hp.channels)
     loader_train = DataLoader(dataset_train,
                               batch_size=hp.batch_size,
                               num_workers=num_workers,
@@ -161,8 +162,9 @@ elif args.test:
     # noinspection PyUnboundLocalVariable
     trainer.test(loader, logdir_test)
 elif args.infer: 
+
     # Train Set
-    dataset = ComplexSpecDataset('train')
+    dataset =  ComplexSpecDataset('valid')
     loader = DataLoader(dataset,
                         batch_size=hp.batch_size * 2,
                         num_workers=num_workers,
@@ -171,31 +173,50 @@ elif args.infer:
                         shuffle=False,
                         )
 
-    logdir_infer_train = logdir_infer / "TRAIN" 
-    os.makedirs(logdir_infer_train, exist_ok=True)
+    logdir_infer_valid = logdir_infer / "VALID" 
+    os.makedirs(logdir_infer_valid, exist_ok=True)
 
     if trainer is not None:
-        trainer.infer(loader, logdir_infer_train)
+        trainer.infer(loader, logdir_infer_valid)
     else:
-        createLin(loader, logdir_infer_train, hp.num_snr)
-    # Test Set
-    dataset = ComplexSpecDataset('test')
-    loader = DataLoader(dataset,
-                        batch_size=hp.batch_size * 2,
-                        num_workers=num_workers,
-                        collate_fn=dataset.pad_collate,
-                        pin_memory=(hp.device != 'cpu'),
-                        shuffle=False,
-                        )
+        createLin(loader, logdir_infer_valid, hp.num_snr)
 
-    hp.num_snr = 1
-    logdir_infer_test = logdir_infer / "TEST" 
-    os.makedirs(logdir_infer_test, exist_ok=True)
+    if hp.infer_all:
+        # Train Set
+        dataset = ComplexSpecDataset('train')
+        loader = DataLoader(dataset,
+                            batch_size=hp.batch_size * 2,
+                            num_workers=num_workers,
+                            collate_fn=dataset.pad_collate,
+                            pin_memory=(hp.device != 'cpu'),
+                            shuffle=False,
+                            )
 
-    if trainer is not None:
-        trainer.infer(loader, logdir_infer_test)
-    else:
-        createLin(loader, logdir_infer_test, 1)
+        logdir_infer_train = logdir_infer / "TRAIN" 
+        os.makedirs(logdir_infer_train, exist_ok=True)
+
+        if trainer is not None:
+            trainer.infer(loader, logdir_infer_train)
+        else:
+            createLin(loader, logdir_infer_train, hp.num_snr)
+        # Test Set
+        dataset = ComplexSpecDataset('test')
+        loader = DataLoader(dataset,
+                            batch_size=hp.batch_size * 2,
+                            num_workers=num_workers,
+                            collate_fn=dataset.pad_collate,
+                            pin_memory=(hp.device != 'cpu'),
+                            shuffle=False,
+                            )
+
+        hp.num_snr = 1
+        logdir_infer_test = logdir_infer / "TEST" 
+        os.makedirs(logdir_infer_test, exist_ok=True)
+
+        if trainer is not None:
+            trainer.infer(loader, logdir_infer_test)
+        else:
+            createLin(loader, logdir_infer_test, 1)
 
 
 else:

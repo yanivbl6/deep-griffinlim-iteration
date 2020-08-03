@@ -39,7 +39,7 @@ class _HyperParameters:
     l_frame: int = 512
     n_freq: int = 257
     l_hop: int = 256
-    num_snr: int = 3
+    num_snr: int = 1
 
 
     use_mel: bool = True

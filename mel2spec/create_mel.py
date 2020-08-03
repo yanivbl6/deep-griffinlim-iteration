@@ -136,11 +136,13 @@ if __name__ == "__main__":
         flist_speech = flist_speech[:hp.n_data]
 
     path_mel = hp.dict_path['mel_train']
-    path_mel2 = hp.dict_path['mel_test']
+    path_mel2 = hp.dict_path['mel_valid']
+    path_mel3 = hp.dict_path['mel_test']
 
 
     os.makedirs(path_mel, exist_ok=True)
     os.makedirs(path_mel2, exist_ok=True)
+    os.makedirs(path_mel3, exist_ok=True)
 
     pool = mp.Pool(
         processes=mp.cpu_count()//2 - 1,
@@ -150,12 +152,18 @@ if __name__ == "__main__":
 
     form="{:05d}_mel%d.npz" % hp.mel_freq
 
+    validation_every = int(100*hp.train_ratio)
+
     pbar = tqdm(flist_speech, dynamic_ncols=True)
     for i_speech, path_speech in enumerate(pbar):
         speech = sf.read(str(path_speech))[0].astype(np.float32)
         mdict = save_feature(stft, i_speech, str(path_speech), speech)
         
-        if i_speech % 1000 > 0:
+        if i_speech % 1000 == 0:
+            np.savez(path_mel3 / form.format(i_speech),
+                        **mdict,
+                        )
+        elif i_speech % 100 <= validation_every:
             np.savez(path_mel / form.format(i_speech),
                         **mdict,
                         )
