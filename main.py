@@ -38,6 +38,7 @@ from torch.utils.data import DataLoader
 from dataset import ComplexSpecDataset
 from hparams import hp
 from train import Trainer
+from pathlib import Path
 
 tfevents_fname = 'events.out.tfevents.*'
 form_overwrite_msg = 'The folder "{}" already has tfevent files. Continue? [y/n]\n'
@@ -73,7 +74,11 @@ os.makedirs(logdir_train, exist_ok=True)
 
 if args.test:
     logdir_test = hp.logdir
-    foldername_test = f'test_{args.epoch}'
+    if hp.dest_test == '':
+        foldername_test = f'test_{args.epoch}'
+    else:
+        foldername_test = Path(hp.dest_test)
+
     if hp.n_save_block_outs > 0:
         foldername_test += '_blockouts'
     logdir_test /= foldername_test
@@ -125,6 +130,18 @@ if args.train:
     trainer.train(loader_train, loader_valid, logdir_train, first_epoch)
 else:  # args.test
     # Test Set
+    if hp.speed_test:
+        loader_valid = DataLoader(dataset_valid,
+                                batch_size=hp.batch_size * 2,
+                                num_workers=hp.num_workers,
+                                collate_fn=dataset_valid.pad_collate,
+                                pin_memory=(hp.device != 'cpu'),
+                                shuffle=False,
+                                drop_last=True,
+                                )
+        
+        trainer.speedtest(loader_valid, logdir_test)
+
     dataset_test = ComplexSpecDataset('test')
     loader = DataLoader(dataset_test,
                         batch_size=hp.batch_size * 2,
@@ -133,6 +150,4 @@ else:  # args.test
                         pin_memory=(hp.device != 'cpu'),
                         shuffle=False,
                         )
-
-    # noinspection PyUnboundLocalVariable
     trainer.test(loader, logdir_test)

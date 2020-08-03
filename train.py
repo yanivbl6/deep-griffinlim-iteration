@@ -360,10 +360,12 @@ class Trainer:
 
         group = logdir.name.split('_')[0]
 
-        self.writer = CustomWriter(str(logdir), group=group)
+        if self.writer is None:
+            self.writer = CustomWriter(str(logdir), group=group)
 
         avg_measure = None
         self.model.eval()
+        depth = hp.model['depth']
 
         module_counts = None
         if hp.n_save_block_outs:
@@ -414,11 +416,11 @@ class Trainer:
                 avg_measure2 = AverageMeter()
 
                 etime = ms(stime)
-                speed =   (1000* max_length / hp.fs) * len(T_ys) / (etime)
+                speed =   (max_length / hp.fs) * len(T_ys) / (etime/ 1000)
                 ##print("degli: %d repeats, length: %d, time: %d miliseconds, ratio = %.02f" % (repeats, max_length , etime, speed))
-                self.writer.add_scalar("Test Performance/degli", speed, repeats)
+                ##self.writer.add_scalar("Test Performance/degli", speed, repeats)
                 # write summary
-                for i_b in  tqdm(range(len(T_ys)), desc=group, dynamic_ncols=True):
+                for i_b in  tqdm(range(len(T_ys)), desc="degli, %d repeats" % repeats , dynamic_ncols=True):
                     i_sample = cnt_sample + i_b
 
                     if not i_b in sampleDict:
@@ -448,10 +450,10 @@ class Trainer:
                 etime = ms(stime)
                 speed =   (1000* max_length / hp.fs) * len(T_ys) / (etime)
                 ##print("pure gla: %d repeats, length: %d, time: %d miliseconds, ratio = %.02f" % (repeats, max_length , etime, speed))
-                self.writer.add_scalar("Test Performance/gla", speed, repeats)
+                ##self.writer.add_scalar("Test Performance/gla", speed, repeats)
 
                 # write summary
-                for i_b in  tqdm(range(len(T_ys)), desc=group, dynamic_ncols=True):
+                for i_b in  tqdm(range(len(T_ys)), desc="GLA, %d repeats" % repeats, dynamic_ncols=True):
                     i_sample = cnt_sample + i_b
                     sampleItem  = sampleDict[i_b]
                     reused_sample = sampleItem[0]
@@ -463,10 +465,72 @@ class Trainer:
 
                 cnt_sample += len(T_ys)
 
-                self.writer.add_scalar(f'STOI/Average Measure/deGLI', avg_measure.get_average()[0], repeats)
-                self.writer.add_scalar(f'STOI/Average Measure/GLA', avg_measure2.get_average()[0], repeats)
+                self.writer.add_scalar(f'STOI/Average Measure/deGLI', avg_measure.get_average()[0], repeats*depth)
+                self.writer.add_scalar(f'STOI/Average Measure/GLA', avg_measure2.get_average()[0], repeats*depth)
                 repeats = repeats * 2
+            break
+        self.model.train()
 
+
+
+
+        self.writer.close()  # Explicitly close
+
+        ##print()
+        ##str_avg_measure = arr2str(avg_measure).replace('\n', '; ')
+        ##print(f'Average: {str_avg_measure}')
+
+    @torch.no_grad()
+    def speedtest(self, loader: DataLoader, logdir: Path):
+        group = logdir.name.split('_')[0]
+
+        if self.writer is None:
+            self.writer = CustomWriter(str(logdir), group=group)
+
+        depth = hp.model['depth']
+
+
+        ##pbar = tqdm(loader, desc=group, dynamic_ncols=True)
+        repeats =1
+        while repeats <= hp.repeat_test:
+            stime = time()
+
+
+            pbar = tqdm(loader, desc="degli performance, %d repeats" % repeats, dynamic_ncols=True)
+
+
+            tot_len = 0
+            for i_iter, data in enumerate(pbar):
+                # get data
+                x, mag, max_length, y = self.preprocess(data)  # B, C, F, T
+                _, output, residual = self.model(x, mag, max_length,
+                                                repeat=repeats, train_step = hp.pretrain_steps + 1)
+                tot_len = tot_len + max_length
+            
+            etime = int(time()-stime)
+            speed =   (tot_len  / hp.fs)  / (etime )
+            self.writer.add_scalar("Test Performance/degli", speed, repeats*depth)
+            repeats = repeats*2
+
+        repeats =1
+        while repeats <= hp.repeat_test:
+
+            stime = time()
+            pbar = tqdm(loader, desc="GLA performance, %d repeats"  % repeats, dynamic_ncols=True)
+            tot_len = 0
+
+            for i_iter, data in enumerate(pbar):
+                # get data
+                x, mag, max_length, y = self.preprocess(data)  # B, C, F, T
+                _, output = self.model.plain_gla(x, mag, max_length,
+                                                repeat=repeats)
+                tot_len = tot_len + max_length
+
+            etime = int(time()-stime)
+            speed =   (tot_len  / hp.fs)  / (etime)
+            self.writer.add_scalar("Test Performance/gla", speed, repeats*depth)
+            repeats = repeats*2
+            
         self.model.train()
 
 

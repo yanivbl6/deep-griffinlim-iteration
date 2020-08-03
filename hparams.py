@@ -66,8 +66,9 @@ class _HyperParameters:
     n_save_block_outs: int = 0
     n_glim_iter: int = 100
     repeat_train: int = 2
-    repeat_test: int = 32
-    noisy_init: bool = False
+    repeat_test: int = 64
+    noisy_init: bool = True
+    speed_test: bool = False
 
     # paths
     # logdir will be converted to type Path in the init_dependent_vars function
@@ -75,6 +76,7 @@ class _HyperParameters:
     path_speech: Path = Path('/data/TIMIT')
     path_feature: Path = Path('/data')
     path_mel: Path = Path('./data')
+    dest_test: str = ''
     # path_feature: Path = Path('./backup')
     sfx_featuredir: str = ''
 

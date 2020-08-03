@@ -90,14 +90,13 @@ class CustomWriter(SummaryWriter):
                     sample_rate=hp.fs)
 
         dict_eval = result_eval.get()
-        if result_eval_glim:
-            self.dict_eval_glim = result_eval_glim.get()
+        # if result_eval_glim:
+        #     self.dict_eval_glim = result_eval_glim.get()
         # for i, m in enumerate(dict_eval.keys()):
         #     j = i + 1
         #     self.add_scalar(f'{self.group}/{j}_{m}/DeGLI{suffix}', dict_eval[m], step)
 
-        return np.array([list(dict_eval.values()),
-                         list(self.dict_eval_glim.values())], dtype=np.float32)
+        return np.array([list(dict_eval.values())], dtype=np.float32)
 
 
 
@@ -148,11 +147,11 @@ class CustomWriter(SummaryWriter):
         glim_mag = np.abs(librosa.stft(glim_wav, **hp.kwargs_stft))
         y_wav = reconstruct_wave(y, n_sample=length)
         self.y_scale = np.abs(y_wav).max() / 0.5
-        result_eval_glim = self.pool_eval_module.apply_async(
-            calc_using_eval_module,
-            (y_wav, glim_wav)
-        )
-
+        # result_eval_glim = self.pool_eval_module.apply_async(
+        #     calc_using_eval_module,
+        #     (y_wav, glim_wav)
+        # )
+        result_eval_glim = None
         ##result_eval_glim = calc_using_eval_module(y_wav, glim_wav)
 
         # result_eval_glim = None
