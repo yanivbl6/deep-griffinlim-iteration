@@ -23,7 +23,7 @@ parser.add_argument('-l','--list',action='store_true')
 parser.add_argument('--network',type=str)
 parser.add_argument('--mel2spec',type=str)
 parser.add_argument('--device',type=int, default=0)
-parser.add_argument('--dest',type=str, default="/result/inference")
+parser.add_argument('--dest',type=str, default="~/result/inference")
 
 parser.add_argument('--network_results',type=str, default="/result/ngc_results")
 parser.add_argument('--mel2spec_results',type=str, default="/result/mel2spec")

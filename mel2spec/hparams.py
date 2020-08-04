@@ -194,9 +194,9 @@ class _HyperParameters:
         # path
         self.dict_path = dict(
             wav_path= Path(self.path_speech),
-            mel_train=self.path_mel / 'TRAIN',
-            mel_test=self.path_mel / 'TEST',
-            mel_valid=self.path_mel / 'VALID',
+            mel_train=Path(self.path_mel) / 'TRAIN',
+            mel_test=Path(self.path_mel) / 'TEST',
+            mel_valid=Path(self.path_mel) / 'VALID',
             path_features=Path(self.path_features),
 
 

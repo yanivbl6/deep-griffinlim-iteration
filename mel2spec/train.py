@@ -527,7 +527,7 @@ class Trainer:
                     self.base_stoi_scores[i_iter] = self.calc_stoi(y_wav, audio_z)
 
                 avg_stoi_norm.update( stoi_score / self.prev_stoi_scores[i_iter])
-                avg_stoi_base.update(  self.base_stoi_scores[i_iter] / stoi_score)
+                avg_stoi_base.update( stoi_score / self.base_stoi_scores[i_iter])
 
             # write summary
             if i_iter < 4:
