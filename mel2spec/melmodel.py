@@ -15,8 +15,8 @@ class melGen(nn.Module):
     def __init__(self, writer, n_freq  ,meltrans , melgen_config):
         super().__init__()
 
-        self.meltrans = nn.Parameter(torch.transpose(torch.tensor(meltrans),0,1), requires_grad = False) ## maybe turn grad on?
-        self.meltrans_inv = nn.Parameter(torch.transpose(torch.tensor(pinv(meltrans)),0,1), requires_grad = False) ## maybe turn grad on?
+        self.meltrans = nn.Parameter(torch.transpose(torch.tensor(meltrans, dtype=torch.float),0,1), requires_grad = False) ## maybe turn grad on?
+        self.meltrans_inv = nn.Parameter(torch.transpose(torch.tensor(pinv(meltrans), dtype=torch.float),0,1), requires_grad = False) ## maybe turn grad on?
 
         self.parse(writer,   **melgen_config)
 
