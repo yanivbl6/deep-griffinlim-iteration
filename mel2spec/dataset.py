@@ -48,7 +48,7 @@ class ComplexSpecDataset(Dataset):
         #                    length=Channel.ALL,
         #                    path_speech=Channel.ALL)
 
-        self._needs = dict(path_speech=Channel.NONE,
+        self._needs = dict(path_speech=Channel.ALL,
                              wav=Channel.ALL,
                              y=Channel.ALL,
                              length=Channel.ALL,

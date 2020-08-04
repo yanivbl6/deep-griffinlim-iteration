@@ -76,6 +76,7 @@ def createLin(loader: DataLoader, logdir: Path, num_snr:int ):
 
             list_dict.append(
                 dict(spec_noisy=spec_noisy,
+                    speech=speech,
                     spec_clean=spec_clean,
                     mag_clean=mag_clean,
                     path_speech=s_path_speech,

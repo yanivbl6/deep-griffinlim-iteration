@@ -59,6 +59,7 @@ class _HyperParameters:
     learning_rate: float = 5e-4
     thr_clip_grad: float = 4.
     weight_decay: float = 1e-3  # Adam weight_decay
+    num_stoi: int = 100
 
     # summary
     period_save_state: int = 5
@@ -129,6 +130,7 @@ class _HyperParameters:
 
     def __post_init__(self):
         self.channels = dict(path_speech=Channel.NONE,
+                             wav=Channel.ALL,
                              x=Channel.ALL,
                              y=Channel.ALL,
                              y_mag=Channel.ALL,
@@ -172,6 +174,7 @@ class _HyperParameters:
                               )
 
         self.spec_data_names = dict(x='spec_noisy', y='spec_clean',
+                                    wav='speech',
                                     y_mag='mag_clean',
                                     path_speech='path_speech',
                                     length='length',

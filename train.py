@@ -23,7 +23,7 @@ from hparams import hp
 from model import DeGLI, DeqGLI
 
 from tbwriter import CustomWriter
-from utils import AverageMeter, arr2str, draw_spectrogram, print_to_file
+from utils import AverageMeter, arr2str, draw_spectrogram, print_to_file, reconstruct_wave, calc_using_eval_module
 
 from time import time
 
@@ -287,6 +287,7 @@ class Trainer:
         self.model.eval()
 
         avg_loss = AverageMeter(float)
+        avg_measure = AverageMeter(float)
 
         pbar = tqdm(loader, desc='validate ', postfix='[0]', dynamic_ncols=True)
         for i_iter, data in enumerate(pbar):
@@ -306,32 +307,31 @@ class Trainer:
             pbar.set_postfix_str(f'{avg_loss.get_average():.1e}')
 
             # write summary
-            if i_iter == 0:
-                if self.reused_sample is None:
-                    one_sample = ComplexSpecDataset.decollate_padded(data, i_iter)
-                    self.reused_sample, self.result_eval_glim = self.writer.write_zero(0, i_iter, **one_sample, suffix="Base stats")
+            # if i_iter == 0:
+            #     if self.reused_sample is None:
+            #         one_sample = ComplexSpecDataset.decollate_padded(data, i_iter)
+            #         self.reused_sample, self.result_eval_glim = self.writer.write_zero(0, i_iter, **one_sample, suffix="Base stats")
                     
-                out_one = self.postprocess(output, residual, T_ys, i_iter, loader.dataset)
-                self.writer.write_one(0, i_iter, self.result_eval_glim, self.reused_sample ,**out_one, suffix="deGLI")
-            #     # F, T, C
-            #     if not self.valid_eval_sample:
-            #         self.valid_eval_sample = ComplexSpecDataset.decollate_padded(data, 0)
+            #     out_one = self.postprocess(output, residual, T_ys, i_iter, loader.dataset)
+            #     self.writer.write_one(0, i_iter, self.result_eval_glim, self.reused_sample ,**out_one, suffix="deGLI")
 
-            #     out_one = self.postprocess(output, residual, T_ys, 0, loader.dataset)
+            
+            if i_iter < hp.num_stoi:
+                ##import pdb; pdb.set_trace()
+                p = len(T_ys)//2
+                y_wav = data['wav'][p]
+                out = self.postprocess(output, None, T_ys, p, None)['out']
+                out_wav = reconstruct_wave(out, n_sample=data['length'][p])
 
-            #     # ComplexSpecDataset.save_dirspec(
-            #     #     logdir / hp.form_result.format(epoch),
-            #     #     **self.valid_eval_sample, **out_one
-            #     # )
+                measure = calc_using_eval_module(y_wav, out_wav)
+                stoi = measure['STOI']
+                avg_measure.update(stoi)
 
-            #     if not self.writer.reused_sample:
-            #         one_sample = self.valid_eval_sample
-            #     else:
-            #         one_sample = dict()
 
-            #     self.writer.write_one(epoch, 0 , **one_sample, **out_one, suffix=suffix)
 
-        self.writer.add_scalar(f'loss/valid{suffix}', avg_loss.get_average(), epoch)
+
+        self.writer.add_scalar(f'loss/valid', avg_loss.get_average(), epoch)
+        self.writer.add_scalar(f'loss/STOI', avg_measure.get_average(), epoch)
 
         self.model.train()
 

@@ -165,6 +165,8 @@ elif args.infer:
 
     # Train Set
     dataset =  ComplexSpecDataset('valid')
+    ##dataset.set_needs(**hp.channels)
+
     loader = DataLoader(dataset,
                         batch_size=hp.batch_size * 2,
                         num_workers=num_workers,

@@ -45,6 +45,7 @@ class ComplexSpecDataset(Dataset):
 
         # default needs
         self._needs = dict(x=Channel.ALL, y=Channel.ALL,
+                           wav=Channel.ALL,
                            y_mag=Channel.ALL,
                            length=Channel.ALL,
                            path_speech=Channel.ALL)
@@ -115,7 +116,7 @@ class ComplexSpecDataset(Dataset):
         result['T_xs'], result['T_ys'], result['length'] = T_xs, T_ys, length
 
         for key, value in batch[0].items():
-            if type(value) == str:
+            if type(value) == str or key == 'wav':
                 list_data = [batch[idx][key] for idx in idxs_sorted]
                 set_data = set(list_data)
                 if len(set_data) == 1:
