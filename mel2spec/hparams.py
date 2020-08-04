@@ -129,7 +129,7 @@ class _HyperParameters:
 
     def __post_init__(self):
         self.channels = dict(path_speech=Channel.NONE,
-                             x=Channel.ALL,
+                             wav=Channel.ALL,
                              y=Channel.ALL,
                              length=Channel.ALL,
                              )
@@ -172,7 +172,7 @@ class _HyperParameters:
                                     res='spec_dnn_output',
                                     )
 
-        self.mel2spec_data_names = dict(x='mel_mag_clean', y='mag_clean',
+        self.mel2spec_data_names = dict(y='mag_clean', wav='speech',
                                     path_speech='path_speech',
                                     length='length',
                                     out='spec_estimated',

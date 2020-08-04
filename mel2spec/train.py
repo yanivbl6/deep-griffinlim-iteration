@@ -72,6 +72,8 @@ class Trainer:
 
         self.lws_processor = lws.lws(hp.n_fft, hp.l_hop, mode='speech', perfectrec=False)
 
+        self.prev_stoi_scores = {}
+        self.base_stoi_scores = {}
 
         if hp.crit == "l1":
             self.criterion = nn.L1Loss(reduction='none')
@@ -172,12 +174,10 @@ class Trainer:
 
     def preprocess(self, data: Dict[str, Tensor]) -> Tuple[Tensor, Tensor]:
         # B, F, T, C
-        x = data['x']
         y = data['y']
-        x = x.cuda()
         y = y.cuda()
 
-        return x, y
+        return y
 
     @torch.no_grad()
     def postprocess(self, output: Tensor, residual: Tensor, Ts: ndarray, idx: int,
@@ -345,7 +345,7 @@ class Trainer:
             for i_iter, data in enumerate(pbar):
                 # get data
                 ##import pdb; pdb.set_trace()
-                x_mel, y = self.preprocess(data)
+                y = self.preprocess(data)
 
                 x_mel = self.model.spec_to_mel(y) 
 
@@ -450,6 +450,9 @@ class Trainer:
 
         num_filters = len(self.filters)
         avg_stoi = AverageMeter(float)
+        avg_stoi_norm = AverageMeter(float)
+        avg_stoi_base = AverageMeter(float)
+
 
         avg_loss1 = AverageMeter(float)
         avg_lozz1 = AverageMeter(float)
@@ -464,13 +467,12 @@ class Trainer:
         for i_iter, data in enumerate(pbar):
 
             ##import pdb; pdb.set_trace()
-            x_mel, y = self.preprocess(data)  # B, C, F, T
+            y = self.preprocess(data)  # B, C, F, T
             x_mel = self.model.spec_to_mel(y) 
 
             z = self.model.mel_pseudo_inverse(x_mel)
 
             T_ys = data['T_ys']
-            paths = data['path_speech']
 
             x = self.model(x_mel)  # B, C, F, T
             y_mel = self.model.spec_to_mel(x)     
@@ -510,15 +512,22 @@ class Trainer:
                 _x = x[0,0,:,:T_ys[0]].cpu()
                 _y = y[0,0,:,:T_ys[0]].cpu()
                 _z = z[0,0,:,:T_ys[0]].cpu()
+
                 audio_x = self.audio_from_mag_spec(np.abs(_x.numpy()))
-                path_speech = paths[0]
+                y_wav = data['wav'][0]
 
-                y_wav =  sf.read(str(path_speech))[0].astype(np.float32)
-                avg_stoi.update(self.calc_stoi(y_wav, audio_x))
+                stoi_score= self.calc_stoi(y_wav, audio_x)
+                avg_stoi.update(stoi_score)
 
+                if not i_iter in self.prev_stoi_scores:
+                    audio_y = self.audio_from_mag_spec(_y.numpy())
+                    audio_z = self.audio_from_mag_spec(_z.numpy())
 
+                    self.prev_stoi_scores[i_iter] = self.calc_stoi(y_wav, audio_y)
+                    self.base_stoi_scores[i_iter] = self.calc_stoi(y_wav, audio_z)
 
-
+                avg_stoi_norm.update( stoi_score / self.prev_stoi_scores[i_iter])
+                avg_stoi_base.update(  self.base_stoi_scores[i_iter] / stoi_score)
 
             # write summary
             if i_iter < 4:
@@ -555,7 +564,7 @@ class Trainer:
                     self.writer.add_audio(f'Audio{i_iter}/1_DNN_Output',
                                 torch.from_numpy(audio_x / x_scale),
                                 epoch,
-                                sample_rate=hp.fs)
+                                sample_rate=hp.sampling_rate)
                     if epoch ==0:
 
                         audio_y = self.audio_from_mag_spec(y.numpy())
@@ -567,16 +576,13 @@ class Trainer:
                         self.writer.add_audio(f'Audio{i_iter}/0_Pseudo_Inverse',
                                     torch.from_numpy(audio_z / z_scale),
                                     epoch,
-                                    sample_rate=hp.fs)
+                                    sample_rate=hp.sampling_rate)
 
 
                         self.writer.add_audio(f'Audio{i_iter}/2_Real_Spectrogram',
                                     torch.from_numpy(audio_y / y_scale),
                                     epoch,
-                                    sample_rate=hp.fs)
-
-
-
+                                    sample_rate=hp.sampling_rate)
 
 
         self.writer.add_scalar(f'valid/loss', avg_loss1.get_average(), epoch)
@@ -584,6 +590,8 @@ class Trainer:
         self.writer.add_scalar(f'valid/melinv_loss', avg_loss2.get_average(), epoch)
         self.writer.add_scalar(f'valid/melinv_baseline', avg_lozz2.get_average(), epoch)
         self.writer.add_scalar(f'valid/STOI', avg_stoi.get_average(), epoch )
+        self.writer.add_scalar(f'valid/STOI_normalized', avg_stoi_norm.get_average(), epoch )
+        self.writer.add_scalar(f'valid/STOI_improvement', avg_stoi_base.get_average(), epoch )
 
         for j, avg_loss in enumerate(avg_losses):
             k = self.f_specs[j][0]
@@ -630,13 +638,12 @@ class Trainer:
         for i_iter, data in enumerate(loader):
 
             ##import pdb; pdb.set_trace()
-            x_mel, y = self.preprocess(data)  # B, C, F, T
+            y = self.preprocess(data)  # B, C, F, T
             x_mel = self.model.spec_to_mel(y) 
 
             z = self.model.mel_pseudo_inverse(x_mel)
 
             T_ys = data['T_ys']
-            paths = data['path_speech']
             x = self.model(x_mel)  # B, C, F, T
             y_mel = self.model.spec_to_mel(x)     
             z_mel = self.model.spec_to_mel(y)
@@ -678,7 +685,7 @@ class Trainer:
                 _x = x[p,0,:,:T_ys[p]].cpu()
                 _y = y[p,0,:,:T_ys[p]].cpu()
                 _z = z[p,0,:,:T_ys[p]].cpu()
-                path_speech = paths[p]
+                y_wav = data['wav'][p]
 
                 ymin = _y[_y > 0].min()
                 vmin, vmax = librosa.amplitude_to_db(np.array((ymin, _y.max())))
@@ -699,7 +706,7 @@ class Trainer:
                 self.writer.add_audio(f'LWS/1_DNN_Output',
                             torch.from_numpy(audio_x / x_scale),
                             cnt,
-                            sample_rate=hp.fs)
+                            sample_rate=hp.sampling_rate)
 
                 audio_y = self.audio_from_mag_spec(_y.numpy())
                 audio_z = self.audio_from_mag_spec(_z.numpy())
@@ -710,17 +717,16 @@ class Trainer:
                 self.writer.add_audio(f'LWS/0_Pseudo_Inverse',
                             torch.from_numpy(audio_z / z_scale),
                             cnt,
-                            sample_rate=hp.fs)
+                            sample_rate=hp.sampling_rate)
 
 
                 self.writer.add_audio(f'LWS/2_Real_Spectrogram',
                             torch.from_numpy(audio_y / y_scale),
                             cnt,
-                            sample_rate=hp.fs)
+                            sample_rate=hp.sampling_rate)
 
                 ##import pdb; pdb.set_trace()
 
-                y_wav =  sf.read(str(path_speech))[0].astype(np.float32)
                 stoi_scores = {'0_Pseudo_Inverse'       : self.calc_stoi(y_wav, audio_z),
                                '1_DNN_Output'           : self.calc_stoi(y_wav, audio_x),
                                '2_Real_Spectrogram'     : self.calc_stoi(y_wav, audio_y)}
@@ -800,11 +806,10 @@ class Trainer:
         for i_iter, data in enumerate(pbar):
 
             ##import pdb; pdb.set_trace()
-            x_mel, y = self.preprocess(data)  # B, C, F, T
+            y = self.preprocess(data)  # B, C, F, T
             x_mel = self.model.spec_to_mel(y) 
 
             T_ys = data['T_ys']
-            paths = data['path_speech']
             x = self.model(x_mel)  # B, C, F, T
 
             for p in range(len(T_ys)):

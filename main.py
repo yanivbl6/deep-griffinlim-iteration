@@ -145,13 +145,13 @@ else:  # args.test
                                 )
         
         trainer.speedtest(loader_valid, logdir_test)
-
-    dataset_test = ComplexSpecDataset('test')
-    loader = DataLoader(dataset_test,
-                        batch_size=hp.batch_size * 2,
-                        num_workers=hp.num_workers,
-                        collate_fn=dataset_test.pad_collate,
-                        pin_memory=(hp.device != 'cpu'),
-                        shuffle=False,
-                        )
-    trainer.test(loader, logdir_test)
+    else:
+        dataset_test = ComplexSpecDataset('test')
+        loader = DataLoader(dataset_test,
+                            batch_size=hp.batch_size * 2,
+                            num_workers=hp.num_workers,
+                            collate_fn=dataset_test.pad_collate,
+                            pin_memory=(hp.device != 'cpu'),
+                            shuffle=False,
+                            )
+        trainer.test(loader, logdir_test)

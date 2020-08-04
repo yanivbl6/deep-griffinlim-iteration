@@ -44,9 +44,16 @@ class ComplexSpecDataset(Dataset):
         self._PATH = hp.dict_path[f'mel_{kind_data}']
 
         # default needs
-        self._needs = dict(x=Channel.ALL, y=Channel.ALL,
-                           length=Channel.ALL,
-                           path_speech=Channel.ALL)
+        # self._needs = dict(x=Channel.ALL, y=Channel.ALL,
+        #                    length=Channel.ALL,
+        #                    path_speech=Channel.ALL)
+
+        self._needs = dict(path_speech=Channel.NONE,
+                             wav=Channel.ALL,
+                             y=Channel.ALL,
+                             length=Channel.ALL,
+                             )
+
         self.set_needs(**kwargs)
 
         self._all_files = [f for f in self._PATH.glob('*.*') if hp.is_featurefile(f)]
@@ -87,9 +94,8 @@ class ComplexSpecDataset(Dataset):
                         ##print(data.shape)
 
                         sample[k] = torch.from_numpy(data)
-                        
-        for xy in ('x', 'y'):
-            sample[f'T_{xy}'] = sample[xy].shape[1]
+                                
+        sample['T_y'] = sample['y'].shape[1]
 
         return sample
 
@@ -105,16 +111,14 @@ class ComplexSpecDataset(Dataset):
             Values can be an Tensor(cpu), list of str, ndarray of int.
         """
         result = dict()
-        T_xs = np.array([item.pop('T_x') for item in batch])
-        idxs_sorted = np.argsort(T_xs)
-        T_xs = T_xs[idxs_sorted].tolist()
-        T_ys = [batch[idx].pop('T_y') for idx in idxs_sorted]
+        T_ys = np.array([item.pop('T_y') for item in batch])
+        idxs_sorted = np.argsort(T_ys)
         length = [batch[idx].pop('length') for idx in idxs_sorted]
 
-        result['T_xs'], result['T_ys'], result['length'] = T_xs, T_ys, length
+        result['T_ys'], result['length'] = T_ys, length
 
         for key, value in batch[0].items():
-            if type(value) == str:
+            if type(value) == str or key == 'wav':
                 list_data = [batch[idx][key] for idx in idxs_sorted]
                 set_data = set(list_data)
                 if len(set_data) == 1:

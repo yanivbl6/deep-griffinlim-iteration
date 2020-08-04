@@ -87,7 +87,7 @@ class CustomWriter(SummaryWriter):
         self.add_audio(f'{self.group}Audio{idx}/{suffix}_output',
                     torch.from_numpy(out_wav / self.y_scale),
                     step,
-                    sample_rate=hp.fs)
+                    sample_rate=hp.sampling_rate)
 
         dict_eval = result_eval.get()
         # if result_eval_glim:
@@ -179,11 +179,11 @@ class CustomWriter(SummaryWriter):
         self.add_audio(f'{self.group}Audio{idx}/1_Clean_Wave',
                        torch.from_numpy(y_wav / self.y_scale),
                        step,
-                       sample_rate=hp.fs)
+                       sample_rate=hp.sampling_rate)
         self.add_audio(f'{self.group}Audio{idx}/2_GLim_Wave',
                        torch.from_numpy(glim_wav / self.y_scale),
                        step,
-                       sample_rate=hp.fs)
+                       sample_rate=hp.sampling_rate)
         self.reused_sample = dict(x=x,
                                   y_wav=y_wav,
                                   length=length,
