@@ -106,6 +106,17 @@ class _HyperParameters:
     freq_embedding: int = 256
 
 
+    ##model
+    model_type: str = "vanilla"
+    # layers : int = 4
+    # k_x: int = 3
+    # k_y: int = 3
+    # s_x:int  = 1
+    # s_y: int = 2
+    # widening: int = 16 
+    # use_bn: bool = False
+
+    ed_model: Dict[str, Channel] = field(init=False)
 
     # file names
     form_feature: str = '{:04d}_{:+.2f}dB.npz'  # i_speech, snr_db
@@ -142,6 +153,16 @@ class _HyperParameters:
                           depth=2,
                           out_all_block=True
                           )
+
+
+        self.ed_model = dict(layers= 4,
+                            k_x = 3, k_y = 3,
+                            s_x = 1, s_y = 2,
+                            widening = 16, 
+                            use_bn = False,
+                            lamb = 0.2,
+                            linear_finalizer = True
+                            )
 
         self.deq_config = dict( wnorm=False,
                                 num_branches = self.num_branches,

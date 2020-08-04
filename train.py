@@ -23,7 +23,7 @@ from hparams import hp
 from model import DeGLI, DeqGLI
 
 from tbwriter import CustomWriter
-from utils import AverageMeter, arr2str, draw_spectrogram, print_to_file, reconstruct_wave, calc_using_eval_module
+from utils import AverageMeter, arr2str, draw_spectrogram, print_to_file, reconstruct_wave, calc_using_eval_module, count_parameters
 
 from time import time
 
@@ -32,15 +32,17 @@ def ms(stime = None):
         return int(time() * 1000)
     return (int(time() * 1000) - stime)
 
+
 class Trainer:
     def __init__(self, path_state_dict=''):
 
         self.writer: Optional[CustomWriter] = None
 
-        if not hp.use_deq:
-            self.model = DeGLI(self.writer, hp.deq_config, **hp.model)
-        else:
-            self.model = DeqGLI(self.writer, hp.deq_config, hp.n_freq , **hp.model)
+
+        config = {'vanilla': None, "ed": hp.ed_model}[hp.model_type.lower()]
+
+        self.model = DeGLI(self.writer, config, hp.model_type,  hp.n_freq , **hp.model)
+        count_parameters(self.model)
 
         self.module = self.model
         self.criterion = nn.L1Loss(reduction='none')

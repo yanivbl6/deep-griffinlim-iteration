@@ -2,3 +2,4 @@ dataclasses
 termcolor
 pystoi
 lws
+prettytable

@@ -31,7 +31,7 @@ import sys
 sys.path.insert(0, '../')
 from hparams import hp
 from tbwriter import CustomWriter
-from utils import AverageMeter, arr2str, draw_spectrogram, print_to_file, calc_using_eval_module
+from utils import AverageMeter, arr2str, draw_spectrogram, print_to_file, calc_using_eval_module, count_parameters
 
 from time import time
 
@@ -67,6 +67,7 @@ class Trainer:
         meltrans = create_mel_filterbank( hp.fs, hp.n_fft, fmin=hp.mel_fmin, fmax=hp.mel_fmax, n_mels=hp.mel_freq)
 
         self.model = melGen(self.writer, hp.n_freq, meltrans, hp.mel_generator)
+        count_parameters(self.model)
 
         self.module = self.model
 

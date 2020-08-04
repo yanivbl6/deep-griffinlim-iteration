@@ -10,6 +10,8 @@ from lib.modules.optimizations import *
 from lib.models.mdeq import Bottleneck
 from lib.models.mdeq_core import *
 
+import math
+
 class ConvGLU(nn.Module):
     def __init__(self, in_ch, out_ch, kernel_size=(7, 7), padding=None, batchnorm=False):
         super().__init__()
@@ -223,8 +225,140 @@ class DeGLI_DNN(nn.Module):
         x = self.conv(x)
         return x
 
+class DeGLI_ED(nn.Module):
+    def __init__(self, n_freq, config):
+        super().__init__()
+
+        self.parse(**config)
+
+        layer_specs = [
+            6, # encoder_1: [batch, 128, 128, 1] => [batch, 128, 128, ngf]
+            self.widening, # encoder_1: [batch, 128, 128, 1] => [batch, 128, 128, ngf]
+            self.widening * 2, # encoder_2: [batch, 128, 128, ngf] => [batch, 64, 64, ngf * 2]
+            self.widening * 4, # encoder_3: [batch, 64, 64, ngf * 2] => [batch, 32, 32, ngf * 4]
+            self.widening * 8, # encoder_4: [batch, 32, 32, ngf * 4] => [batch, 16, 16, ngf * 8]
+            self.widening * 8, # encoder_5: [batch, 16, 16, ngf * 8] => [batch, 8, 8, ngf * 8]
+            self.widening * 8, # encoder_6: [batch, 8, 8, ngf * 8] => [batch, 4, 4, ngf * 8]
+            self.widening * 8, # encoder_7: [batch, 4, 4, ngf * 8] => [batch, 2, 2, ngf * 8]
+            self.widening * 8, # encoder_8: [batch, 2, 2, ngf * 8] => [batch, 1, 1, ngf * 8]
+        ]
+
+        layer_specs = layer_specs[0:self.n_layers+1]
 
 
+        self.encoders = nn.ModuleList()
+
+        conv, pad = self._gen_conv(layer_specs[0] ,layer_specs[1])
+        self.encoders.append(nn.Sequential(pad, conv))
+        
+        last_ch = layer_specs[1]
+
+        for i,ch_out in enumerate(layer_specs[2:]):
+            d = OrderedDict()
+            d['act'] = nn.LeakyReLU(self.lamb)
+            gain  = math.sqrt(2.0/(1.0+self.lamb**2))
+            gain = gain / math.sqrt(2)  ## for naive signal propagation with residual w/o bn
+
+            conv, pad  = self._gen_conv(last_ch ,ch_out, gain = gain)
+
+            d['pad'] = pad
+            d['conv'] = conv
+
+            if self.use_batchnorm:
+                d['bn']  = nn.BatchNorm2d(ch_out)
+
+            encoder_block = nn.Sequential(d)
+            self.encoders.append(encoder_block)
+            last_ch = ch_out
+
+        layer_specs.reverse()
+        self.decoders = nn.ModuleList()
+        kernel_size = 4
+        for i,ch_out in enumerate(layer_specs[1:]):
+
+            d = OrderedDict()
+            d['act'] = nn.ReLU()
+            gain  =  math.sqrt(2.0/(1.0+self.lamb**2))
+            gain = gain / math.sqrt(2) 
+
+            if i == len(layer_specs)-2:
+                 kernel_size = 5
+                 ch_out = 2
+            conv = self._gen_deconv(last_ch, ch_out , gain = gain, k= kernel_size)
+            d['conv'] = conv
+
+            # if i < self.num_dropout and self.droprate > 0.0:
+            #     d['dropout'] = nn.Dropout(self.droprate)
+
+            if self.use_batchnorm and i < self.n_layers-1:
+                d['bn']  = nn.BatchNorm2d(ch_out)
+
+            decoder_block = nn.Sequential(d)
+            self.decoders.append(decoder_block)
+            last_ch = ch_out * 2
+
+        if self.use_linear_finalizer:
+            init_alpha = 0.001
+            self.linear_finalizer = nn.Parameter(torch.ones(n_freq) * init_alpha , requires_grad = True)
+
+    def parse(self, layers:int, k_x:int, k_y:int, s_x:int, s_y:int, widening:int,use_bn: bool, lamb: float, linear_finalizer:bool) :
+        self.n_layers = layers
+        self.k_xy = (k_x, k_y)
+        self.s_xy = (s_x, s_y)
+        self.widening = widening
+        self.use_batchnorm = use_bn
+        self.lamb = lamb
+        self.use_linear_finalizer = linear_finalizer
+
+    def forward(self, x, mag_replaced, consistent, train_step = -1):
+        
+        
+        ##import pdb; pdb.set_trace()
+        x = torch.cat([x, mag_replaced, consistent], dim=1)
+
+        encoders_output = []
+
+
+        for i,encoder in enumerate(self.encoders):
+            x = encoder(x)
+            encoders_output.append(x)
+
+        for i,decoder in enumerate(self.decoders[:-1]):
+            x = decoder(x)
+            x = torch.cat([x, encoders_output[-(i+2)]], dim=1)
+
+        x = self.decoders[-1](x) 
+
+        if self.use_linear_finalizer:
+            x_perm = x.permute(0,1,3,2)
+            x = torch.mul(x_perm,  self.linear_finalizer) 
+            x = x.permute(0,1,3,2)
+
+        return x
+
+    def _gen_conv(self, in_ch,  out_ch, strides = (2, 1), kernel_size = (5,3), gain = math.sqrt(2), pad = (1,1,1,2)):
+        # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
+
+        pad = torch.nn.ReplicationPad2d(pad)
+        conv =  nn.Conv2d(in_ch, out_ch, kernel_size=kernel_size, stride = strides , padding=0)
+
+        w = conv.weight
+        k = w.size(1) * w.size(2) * w.size(3)
+        conv.weight.data.normal_(0.0, gain / math.sqrt(k) )
+        nn.init.constant_(conv.bias,0.01)
+        return conv, pad 
+
+    def _gen_deconv(self, in_ch,  out_ch, strides = (2, 1), k = 4, gain = math.sqrt(2), p =1 ):
+        # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
+
+        conv =  nn.ConvTranspose2d(in_ch, out_ch, kernel_size= (k,3), stride = strides, padding_mode='zeros',padding = (p,1), dilation  = 1)
+
+        w = conv.weight
+        k = w.size(1) * w.size(2) * w.size(3)
+        conv.weight.data.normal_(0.0, gain / math.sqrt(k) )
+        nn.init.constant_(conv.bias,0.01)
+
+        return conv
 
 def replace_magnitude(x, mag):
     phase = torch.atan2(x[:, 1:], x[:, :1])  # imag, real
@@ -232,16 +366,19 @@ def replace_magnitude(x, mag):
 
 
 class DeGLI(nn.Module):
-    def __init__(self, writer, dedeq_config , n_fft: int, hop_length: int, depth:int, out_all_block:bool):
+    def __init__(self, writer, model_config,  model_type ,  n_freq:int , n_fft: int, hop_length: int, depth:int, out_all_block:bool):
         super().__init__()
         self.n_fft = n_fft
         self.hop_length = hop_length
         self.out_all_block = out_all_block
-
         self.window = nn.Parameter(torch.hann_window(n_fft), requires_grad=False)
         self.istft = InverseSTFT(n_fft, hop_length=self.hop_length, window=self.window.data)
 
-        self.dnns = nn.ModuleList([DeGLI_DNN() for _ in range(depth)])
+        model_type = model_type.lower()
+        if model_type == "vanilla":
+            self.dnns = nn.ModuleList([DeGLI_DNN() for _ in range(depth)])
+        elif model_type == "ed":
+            self.dnns = nn.ModuleList([DeGLI_ED( n_freq ,model_config) for _ in range(depth)])
 
     def stft(self, x):
         return torch.stft(x, n_fft=self.n_fft, hop_length=self.hop_length, window=self.window)

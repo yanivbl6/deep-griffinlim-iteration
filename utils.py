@@ -11,6 +11,7 @@ from numpy import ndarray
 from hparams import hp
 ##from matlab_lib import Evaluation as EvalModule
 from pystoi import stoi
+from prettytable import PrettyTable
 
 
 EVAL_METRICS = ('STOI')
@@ -195,3 +196,17 @@ def print_to_file(fname: Union[str, Path], fn: Callable, args=None, kwargs=None)
     with (fname.open('w') if fname else open(os.devnull, 'w')) as file:
         with contextlib.redirect_stdout(file):
             fn(*args, **kwargs)
+
+
+def count_parameters(model):
+    table = PrettyTable(["Modules", "Parameters"])
+    total_params = 0
+    for name, parameter in model.named_parameters():
+        if not parameter.requires_grad: continue
+        param = parameter.numel()
+        table.add_row([name, param])
+        total_params+=param
+    print(table)
+    print(f"Total Trainable Params: {total_params}")
+    return total_params
+    
