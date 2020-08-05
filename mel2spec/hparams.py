@@ -71,6 +71,7 @@ class _HyperParameters:
     #loss
     crit: str = "l1"
     l2_factor: float  = 1.0
+    loss_mode: int = 0
 
     # training
     n_data: int = 0  # <=0 to use all data

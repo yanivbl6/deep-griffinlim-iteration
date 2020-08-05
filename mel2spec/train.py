@@ -86,8 +86,16 @@ class Trainer:
 
         self.criterion2 = nn.L1Loss(reduction='none')
 
-        self.f_specs= [(5, 2),(15,5)]
 
+        self.f_specs=  {0: [(5, 2),(15,5)],
+                        1: [(5, 2)],
+                        2: [(3 ,1)],
+                        3: [(3 ,1),(5, 2 )],
+                        4: [(3 ,1),(5, 2 ), ( 7,3 )  ],
+                        5: [(15 ,5)],
+                        6: [(3 ,1),(5, 2 ), ( 7,3 ), (15,5), (25,10)],
+                        7: [(1 ,1)]}[hp.loss_mode]
+                        
         self.filters = [gen_filter(k) for  k,s in self.f_specs]
 
 
