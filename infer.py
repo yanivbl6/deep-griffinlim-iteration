@@ -20,19 +20,22 @@ parser = ArgumentParser()
 
 parser.add_argument('-l','--list',action='store_true')
 
-parser.add_argument('--network',type=str)
-parser.add_argument('--mel2spec',type=str)
-parser.add_argument('--device',type=int, default=0)
-parser.add_argument('--dest',type=str, default="~/result/inference")
+parser.add_argument('-n','--network',type=str)
+parser.add_argument('-m','--mel2spec',type=str)
+parser.add_argument('-d','--device',type=int, default=0)
+parser.add_argument('--dest',type=str, default="../result/inference")
 
-parser.add_argument('--network_results',type=str, default="/result/ngc_results")
-parser.add_argument('--mel2spec_results',type=str, default="/result/mel2spec")
+parser.add_argument('--network_results',type=str, default="../result/degli")
+parser.add_argument('--mel2spec_results',type=str, default="../result/mel2spec")
+parser.add_argument('-p','--perf', action='store_true')
 
 
 args = parser.parse_args()
 
 ##import pdb; pdb.set_trace()
 if args.list:
+    print('-'*30)
+    print("Available Networks:")
     for f in listdir(args.network_results):
         full_path = "%s/%s" % (args.network_results,f)
         if not os.path.isdir(full_path):  
@@ -46,8 +49,9 @@ if args.list:
             if e.__str__()[-2:] == "pt":
                 checkpoints.append(int(e.split('.')[0]))
         if len(checkpoints) > 0:
-            print("network: %s" % f)
-            print(checkpoints)
+            print("%s : %s" % (f,checkpoints.__str__()))
+    print('-'*30)
+    print("Available Mel2Spec infered data:")
 
     for f in listdir(args.mel2spec_results):
         full_path = "%s/%s" % (args.mel2spec_results,f)
@@ -58,8 +62,8 @@ if args.list:
             if e.split('_')[0] == "infer":
                 checkpoints.append(int(e.split('_')[1]))
         if len(checkpoints) > 0:
-            print("mel2spec: %s" % f)
-            print(checkpoints)
+            print("%s : %s" % (f,checkpoints.__str__()))
+    print('-'*30)
 
 if not args.network is None:
     net_split = args.network.split(":")
@@ -76,5 +80,12 @@ if not args.network is None:
         full_dest= f"{args.dest}/{networkDir}_E{networkEpoch}_baseline"
 
     os.makedirs(args.dest, exist_ok=True)
-    cmd=f"python main.py --test --device {args.device} --from {networkEpoch} --logdir {args.network_results}/{networkDir} --path_feature {mel_dest} --dest_test {full_dest} --batch_size 16"
+
+    command = "test"
+    if args.perf:
+        full_dest = full_dest + "_perf"
+        command = "perf"
+    cmd=f"python main.py --{command} --device {args.device} --from {networkEpoch} --logdir {args.network_results}/{networkDir} --path_feature {mel_dest} --dest_test {full_dest} --batch_size 16"
+
+
     print(cmd)

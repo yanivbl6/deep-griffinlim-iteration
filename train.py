@@ -287,11 +287,13 @@ class Trainer:
         suffix = f'_{repeat}' if repeat > 1 else ''
 
         self.model.eval()
-
+        stoi_cnt = 0
         avg_loss = AverageMeter(float)
         avg_measure = AverageMeter(float)
 
         pbar = tqdm(loader, desc='validate ', postfix='[0]', dynamic_ncols=True)
+
+        num_iters = len(pbar)
         for i_iter, data in enumerate(pbar):
             # get data
             x, mag, max_length, y = self.preprocess(data)  # B, C, F, T
@@ -318,18 +320,17 @@ class Trainer:
             #     self.writer.write_one(0, i_iter, self.result_eval_glim, self.reused_sample ,**out_one, suffix="deGLI")
 
             
-            if i_iter < hp.num_stoi:
+            if stoi_cnt <= hp.num_stoi:
                 ##import pdb; pdb.set_trace()
-                p = len(T_ys)//2
-                y_wav = data['wav'][p]
-                out = self.postprocess(output, None, T_ys, p, None)['out']
-                out_wav = reconstruct_wave(out, n_sample=data['length'][p])
+                for p in range(min(hp.num_stoi// num_iters,len(T_ys))):
+                    y_wav = data['wav'][p]
+                    out = self.postprocess(output, None, T_ys, p, None)['out']
+                    out_wav = reconstruct_wave(out, n_sample=data['length'][p])
 
-                measure = calc_using_eval_module(y_wav, out_wav)
-                stoi = measure['STOI']
-                avg_measure.update(stoi)
-
-
+                    measure = calc_using_eval_module(y_wav, out_wav)
+                    stoi = measure['STOI']
+                    avg_measure.update(stoi)
+                    stoi_cnt = stoi_cnt + 1
 
 
         self.writer.add_scalar(f'loss/valid', avg_loss.get_average(), epoch)

@@ -47,11 +47,12 @@ parser = ArgumentParser()
 
 parser.add_argument('--train', action='store_true')
 parser.add_argument('--test', action='store_true')
+parser.add_argument('--perf', action='store_true')
 parser.add_argument('--from', type=int, default=-1, dest='epoch', metavar='EPOCH')
 
 args = hp.parse_argument(parser)
 del parser
-if not (args.train ^ args.test) or args.epoch < -1:
+if not (args.train ^ args.test ^ args.perf) or args.epoch < -1:
     raise ArgumentError
 
 # directory
@@ -72,7 +73,7 @@ if (args.train and args.epoch == -1 and
         exit()
 os.makedirs(logdir_train, exist_ok=True)
 
-if args.test:
+if args.test or args.perf:
     logdir_test = hp.logdir
     if hp.dest_test == '':
         foldername_test = f'test_{args.epoch}'
@@ -131,27 +132,27 @@ if args.train:
                               )
 
     trainer.train(loader_train, loader_valid, logdir_train, first_epoch)
-else:  # args.test
+elif args.test:
     # Test Set
-    if hp.speed_test:
-        dataset_valid = ComplexSpecDataset('valid')
-        loader_valid = DataLoader(dataset_valid,
-                                batch_size=hp.batch_size * 2,
-                                num_workers=hp.num_workers,
-                                collate_fn=dataset_valid.pad_collate,
-                                pin_memory=(hp.device != 'cpu'),
-                                shuffle=False,
-                                drop_last=True,
-                                )
-        
-        trainer.speedtest(loader_valid, logdir_test)
-    else:
-        dataset_test = ComplexSpecDataset('test')
-        loader = DataLoader(dataset_test,
+
+    dataset_test = ComplexSpecDataset('test')
+    loader = DataLoader(dataset_test,
+                        batch_size=hp.batch_size * 2,
+                        num_workers=hp.num_workers,
+                        collate_fn=dataset_test.pad_collate,
+                        pin_memory=(hp.device != 'cpu'),
+                        shuffle=False,
+                        )
+    trainer.test(loader, logdir_test)
+else:
+    dataset_valid = ComplexSpecDataset('valid')
+    loader_valid = DataLoader(dataset_valid,
                             batch_size=hp.batch_size * 2,
                             num_workers=hp.num_workers,
-                            collate_fn=dataset_test.pad_collate,
+                            collate_fn=dataset_valid.pad_collate,
                             pin_memory=(hp.device != 'cpu'),
                             shuffle=False,
+                            drop_last=True,
                             )
-        trainer.test(loader, logdir_test)
+    
+    trainer.speedtest(loader_valid, logdir_test)

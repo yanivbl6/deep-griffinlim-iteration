@@ -531,7 +531,8 @@ class Trainer:
                 avg_stoi_base.update( stoi_score / self.base_stoi_scores[i_iter])
 
             # write summary
-            if i_iter < 4:
+            ## if i_iter < 4:
+            if False: ## stoi is good enough until tests
                 x = x[0,0,:,:T_ys[0]].cpu()
                 y = y[0,0,:,:T_ys[0]].cpu()
                 z = z[0,0,:,:T_ys[0]].cpu()
