@@ -12,7 +12,7 @@ from lib.models.mdeq_core import *
 
 import math
 
-def str2act(txt, param= ""):
+def str2act(txt, param= None):
     return {"sigmoid": nn.Sigmoid(), "relu": nn.ReLU(), "none": nn.Sequential() , "lrelu": nn.LeakyReLU(param), "selu": nn.SELU() }[txt.lower()]
 
 class ConvGLU(nn.Module):
@@ -277,7 +277,7 @@ class DeGLI_ED(nn.Module):
 
         for i,ch_out in enumerate(layer_specs[2:]):
             d = OrderedDict()
-            d['act'] = str2act(self.act)
+            d['act'] = str2act(self.act,self.lamb)
             gain  = math.sqrt(2.0/(1.0+self.lamb**2))
             gain = gain / math.sqrt(2)  ## for naive signal propagation with residual w/o bn
 
@@ -299,7 +299,7 @@ class DeGLI_ED(nn.Module):
         for i,ch_out in enumerate(layer_specs[1:]):
 
             d = OrderedDict()
-            d['act'] =  self.sigmoid = str2act(self.act2,self.lamb)
+            d['act'] = str2act(self.act2,self.lamb)
             gain  =  math.sqrt(2.0/(1.0+self.lamb**2))
             gain = gain / math.sqrt(2) 
 
