@@ -12,19 +12,28 @@ from lib.models.mdeq_core import *
 
 import math
 
+def str2act(txt, param= ""):
+    return {"sigmoid": nn.Sigmoid(), "relu": nn.ReLU(), "none": nn.Sequential() , "lrelu": nn.LeakyReLU(param), "selu": nn.SELU() }[txt.lower()]
+
 class ConvGLU(nn.Module):
-    def __init__(self, in_ch, out_ch, kernel_size=(7, 7), padding=None, batchnorm=False):
+    def __init__(self, in_ch, out_ch, kernel_size=(7, 7), padding=None, batchnorm=False, act="sigmoid", stride = None):
         super().__init__()
         if not padding:
             padding = (kernel_size[0] // 2 , kernel_size[1] // 2 )
-        self.conv = nn.Conv2d(in_ch, out_ch * 2, kernel_size, padding=padding)
+        if stride is None:
+            self.conv = nn.Conv2d(in_ch, out_ch * 2, kernel_size, padding=padding)
+        else:
+            self.conv = nn.Conv2d(in_ch, out_ch * 2, kernel_size, padding=padding, stride= stride)
+        self.weight = self.conv.weight
+        self.bias = self.conv.bias
+
         if batchnorm:
             self.conv = nn.Sequential(
                 self.conv,
                 nn.BatchNorm2d(out_ch * 2)
             )
-        self.sigmoid = nn.Sigmoid()
-
+        self.sigmoid = str2act(act)
+        
     def forward(self, x):
         x = self.conv(x)
         ch = x.shape[1]
@@ -204,16 +213,22 @@ class DeGLI_DEQ(nn.Module):
         return nn.Sequential(*layers)
 
 class DeGLI_DNN(nn.Module):
-    def __init__(self,writer=None):
+    def __init__(self, config):
         super().__init__()
-        ch_hidden = 16
-        self.convglu_first = ConvGLU(6, ch_hidden, kernel_size=(11, 11), batchnorm=True)
+
+        k_x1, k_y1, k_x2 ,k_y2 = self.parse(**config)
+
+        ch_hidden = self.ch_hidden
+
+        self.convglu_first = ConvGLU(6, ch_hidden, kernel_size=(k_y1, k_x1), batchnorm=True, act=self.act)
         self.two_convglus = nn.Sequential(
-            ConvGLU(ch_hidden, ch_hidden, batchnorm=True),
-            ConvGLU(ch_hidden, ch_hidden)
+            ConvGLU(ch_hidden, ch_hidden, batchnorm=True, act=self.act, kernel_size=(k_y2, k_x2)),
+            ConvGLU(ch_hidden, ch_hidden, act=self.act, kernel_size=(k_y2, k_x2))
         )
-        self.convglu_last = ConvGLU(ch_hidden, ch_hidden)
-        self.conv = nn.Conv2d(ch_hidden, 2, kernel_size=(7, 7), padding=(3, 3))
+        self.convglu_last = ConvGLU(ch_hidden, ch_hidden , act=self.act)
+
+
+        self.conv = nn.Conv2d(ch_hidden, 2, kernel_size=(k_y2, k_x2), padding=( (k_y2-1)//2 ,  (k_x2-1)//2  ) )
 
     def forward(self, x, mag_replaced, consistent, train_step = -1):
         x = torch.cat([x, mag_replaced, consistent], dim=1)
@@ -224,6 +239,13 @@ class DeGLI_DNN(nn.Module):
         x = self.convglu_last(x)
         x = self.conv(x)
         return x
+
+    def parse(self, k_x1: int = 11, k_y1: int = 11, k_x2: int = 7, k_y2: int = 7, num_channel: int=16,  act = "sigmoid"):
+        self.ch_hidden = num_channel
+
+        self.act = act.lower()
+        return (k_x1, k_y1, k_x2 ,k_y2)
+
 
 class DeGLI_ED(nn.Module):
     def __init__(self, n_freq, config):
@@ -248,18 +270,18 @@ class DeGLI_ED(nn.Module):
 
         self.encoders = nn.ModuleList()
 
-        conv, pad = self._gen_conv(layer_specs[0] ,layer_specs[1])
+        conv, pad = self._gen_conv(layer_specs[0] ,layer_specs[1], convGlu = self.convGlu)
         self.encoders.append(nn.Sequential(pad, conv))
         
         last_ch = layer_specs[1]
 
         for i,ch_out in enumerate(layer_specs[2:]):
             d = OrderedDict()
-            d['act'] = nn.LeakyReLU(self.lamb)
+            d['act'] = str2act(self.act)
             gain  = math.sqrt(2.0/(1.0+self.lamb**2))
             gain = gain / math.sqrt(2)  ## for naive signal propagation with residual w/o bn
 
-            conv, pad  = self._gen_conv(last_ch ,ch_out, gain = gain)
+            conv, pad  = self._gen_conv(last_ch ,ch_out, gain = gain, convGlu = self.convGlu)
 
             d['pad'] = pad
             d['conv'] = conv
@@ -277,7 +299,7 @@ class DeGLI_ED(nn.Module):
         for i,ch_out in enumerate(layer_specs[1:]):
 
             d = OrderedDict()
-            d['act'] = nn.ReLU()
+            d['act'] =  self.sigmoid = str2act(self.act2,self.lamb)
             gain  =  math.sqrt(2.0/(1.0+self.lamb**2))
             gain = gain / math.sqrt(2) 
 
@@ -301,7 +323,7 @@ class DeGLI_ED(nn.Module):
             init_alpha = 0.001
             self.linear_finalizer = nn.Parameter(torch.ones(n_freq) * init_alpha , requires_grad = True)
 
-    def parse(self, layers:int, k_x:int, k_y:int, s_x:int, s_y:int, widening:int,use_bn: bool, lamb: float, linear_finalizer:bool) :
+    def parse(self, layers:int, k_x:int, k_y:int, s_x:int, s_y:int, widening:int,use_bn: bool, lamb: float, linear_finalizer:bool, convGlu: bool, act: str, act2 : str) :
         self.n_layers = layers
         self.k_xy = (k_x, k_y)
         self.s_xy = (s_x, s_y)
@@ -309,6 +331,9 @@ class DeGLI_ED(nn.Module):
         self.use_batchnorm = use_bn
         self.lamb = lamb
         self.use_linear_finalizer = linear_finalizer
+        self.convGlu = convGlu
+        self.act = act
+        self.act2 = act2
 
     def forward(self, x, mag_replaced, consistent, train_step = -1):
         
@@ -336,11 +361,13 @@ class DeGLI_ED(nn.Module):
 
         return x
 
-    def _gen_conv(self, in_ch,  out_ch, strides = (2, 1), kernel_size = (5,3), gain = math.sqrt(2), pad = (1,1,1,2)):
+    def _gen_conv(self, in_ch,  out_ch, strides = (2, 1), kernel_size = (5,3), gain = math.sqrt(2), pad = (1,1,1,2), convGlu = False):
         # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
-
         pad = torch.nn.ReplicationPad2d(pad)
-        conv =  nn.Conv2d(in_ch, out_ch, kernel_size=kernel_size, stride = strides , padding=0)
+        if convGlu:
+            conv =  ConvGLU(in_ch, out_ch, kernel_size=kernel_size, stride = strides, batchnorm=True , padding=(0,0), act= "sigmoid")
+        else:
+            conv =  nn.Conv2d(in_ch, out_ch, kernel_size=kernel_size, stride = strides , padding=0)
 
         w = conv.weight
         k = w.size(1) * w.size(2) * w.size(3)
@@ -376,7 +403,7 @@ class DeGLI(nn.Module):
 
         model_type = model_type.lower()
         if model_type == "vanilla":
-            self.dnns = nn.ModuleList([DeGLI_DNN() for _ in range(depth)])
+            self.dnns = nn.ModuleList([DeGLI_DNN(model_config) for _ in range(depth)])
         elif model_type == "ed":
             self.dnns = nn.ModuleList([DeGLI_ED( n_freq ,model_config) for _ in range(depth)])
 

@@ -86,24 +86,6 @@ class _HyperParameters:
 
     ## deq_gli parameters
     use_deq: bool = False
-    wnorm=False,
-    num_branches: int = 1
-    base_channels: int = 16
-    ratio2head: int = 2
-    fuse_method: str = "SUM"
-    droprate: float = 0.0
-    final_multiplier: int = 2
-    pretrain_steps: int = 10000
-    f_thres: int = 24
-    b_thres: int = 24
-    num_layers: int  = 3
-    ch_hidden: int = 16
-    k1: int = 11 
-    k2: int  = 7 
-
-    p2: int = 3
-
-    freq_embedding: int = 256
 
 
     ##model
@@ -130,6 +112,7 @@ class _HyperParameters:
     spec_data_names: Dict[str, str] = field(init=False)
 
     deq_config: Dict[str, Any] = field(init=False)
+    vanilla_model: Dict[str, Any] = field(init=False)
 
 
     # dependent variables
@@ -161,25 +144,32 @@ class _HyperParameters:
                             widening = 16, 
                             use_bn = False,
                             lamb = 0.2,
-                            linear_finalizer = True
+                            linear_finalizer = True,
+                            convGlu = False,
+                            act = "relu",
+                            act2 = "lrelu"
                             )
 
+        self.vanilla_model = dict(k_x1 = 11, k_y1 = 11,
+                            k_x2 = 7, k_y2 = 7, num_channel=16,
+                            act = "sigmoid")
+
         self.deq_config = dict( wnorm=False,
-                                num_branches = self.num_branches,
-                                base_channels = self.base_channels,
-                                ratio2head = self.ratio2head,
-                                fuse_method = self.fuse_method,
-                                droprate = self.droprate,
-                                final_multiplier = self.final_multiplier,
-                                pretrain_steps = self.pretrain_steps,
-                                f_thres = self.f_thres,
-                                b_thres = self.b_thres,
-                                num_layers  = self.num_layers,
-                                ch_hidden= self.ch_hidden,
-                                k1 = self.k1, 
-                                k2 = self.k2, 
-                                p2 = self.p2,
-                                freq_embedding = self.freq_embedding
+                                num_branches = 1,
+                                base_channels = 16,
+                                ratio2head = 2,
+                                fuse_method = "SUM",
+                                droprate = 0.0,
+                                final_multiplier = 2,
+                                pretrain_steps = 10000,
+                                f_thres = 24,
+                                b_thres = 24,
+                                num_layers  = 3,
+                                ch_hidden= 16,
+                                k1 = 11, 
+                                k2 = 7, 
+                                p2 = 3,
+                                freq_embedding = 256
                                 )
 
 
