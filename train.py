@@ -41,7 +41,8 @@ class Trainer:
 
         config = {'vanilla':  hp.vanilla_model, "ed": hp.ed_model}[hp.model_type.lower()]
 
-        self.model = DeGLI(self.writer, config, hp.model_type,  hp.n_freq , **hp.model)
+        self.model = DeGLI(self.writer, config, hp.model_type,  hp.n_freq ,hp.use_fp16 , **hp.model)
+
         count_parameters(self.model)
 
         self.module = self.model

@@ -90,6 +90,8 @@ class _HyperParameters:
 
     ##model
     model_type: str = "vanilla"
+    use_fp16: bool = False
+
     # layers : int = 4
     # k_x: int = 3
     # k_y: int = 3

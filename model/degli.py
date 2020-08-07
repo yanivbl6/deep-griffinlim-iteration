@@ -393,7 +393,7 @@ def replace_magnitude(x, mag):
 
 
 class DeGLI(nn.Module):
-    def __init__(self, writer, model_config,  model_type ,  n_freq:int , n_fft: int, hop_length: int, depth:int, out_all_block:bool):
+    def __init__(self, writer, model_config,  model_type ,  n_freq:int, use_fp16:bool , n_fft: int, hop_length: int, depth:int, out_all_block:bool):
         super().__init__()
         self.n_fft = n_fft
         self.hop_length = hop_length
@@ -406,6 +406,12 @@ class DeGLI(nn.Module):
             self.dnns = nn.ModuleList([DeGLI_DNN(model_config) for _ in range(depth)])
         elif model_type == "ed":
             self.dnns = nn.ModuleList([DeGLI_ED( n_freq ,model_config) for _ in range(depth)])
+
+        self.use_fp16 = use_fp16
+
+        if self.use_fp16:
+            for dnn in self.dnns:
+                dnn = dnn.half()
 
     def stft(self, x):
         return torch.stft(x, n_fft=self.n_fft, hop_length=self.hop_length, window=self.window)
@@ -426,7 +432,11 @@ class DeGLI(nn.Module):
 
                 # B, 2, F, T
                 consistent = consistent.permute(0, 3, 1, 2)
-                residual = dnn(x , mag_replaced, consistent, train_step = train_step)
+                if self.use_fp16:
+                    residual = dnn(x.half() , mag_replaced.half(), consistent.half(), train_step = train_step).float()
+                else:
+                    residual = dnn(x , mag_replaced, consistent, train_step = train_step)
+                
                 x = consistent - residual
             if self.out_all_block:
                 out_repeats.append(x)
