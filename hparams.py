@@ -147,7 +147,8 @@ class _HyperParameters:
                             linear_finalizer = True,
                             convGlu = False,
                             act = "relu",
-                            act2 = "lrelu"
+                            act2 = "lrelu",
+                            glu_bn = True
                             )
 
         self.vanilla_model = dict(k_x1 = 11, k_y1 = 11,

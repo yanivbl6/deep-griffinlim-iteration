@@ -323,7 +323,7 @@ class DeGLI_ED(nn.Module):
             init_alpha = 0.001
             self.linear_finalizer = nn.Parameter(torch.ones(n_freq) * init_alpha , requires_grad = True)
 
-    def parse(self, layers:int, k_x:int, k_y:int, s_x:int, s_y:int, widening:int,use_bn: bool, lamb: float, linear_finalizer:bool, convGlu: bool, act: str, act2 : str) :
+    def parse(self, layers:int, k_x:int, k_y:int, s_x:int, s_y:int, widening:int,use_bn: bool, lamb: float, linear_finalizer:bool, convGlu: bool, act: str, act2 : str, glu_bn:bool) :
         self.n_layers = layers
         self.k_xy = (k_x, k_y)
         self.s_xy = (s_x, s_y)
@@ -334,7 +334,7 @@ class DeGLI_ED(nn.Module):
         self.convGlu = convGlu
         self.act = act
         self.act2 = act2
-
+        self.glu_bn = glu_bn
     def forward(self, x, mag_replaced, consistent, train_step = -1):
         
         
@@ -365,7 +365,7 @@ class DeGLI_ED(nn.Module):
         # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
         pad = torch.nn.ReplicationPad2d(pad)
         if convGlu:
-            conv =  ConvGLU(in_ch, out_ch, kernel_size=kernel_size, stride = strides, batchnorm=True , padding=(0,0), act= "sigmoid")
+            conv =  ConvGLU(in_ch, out_ch, kernel_size=kernel_size, stride = strides, batchnorm=self.glu_bn , padding=(0,0), act= "sigmoid")
         else:
             conv =  nn.Conv2d(in_ch, out_ch, kernel_size=kernel_size, stride = strides , padding=0)
 
