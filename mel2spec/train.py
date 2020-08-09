@@ -473,6 +473,8 @@ class Trainer:
         losses = [None] * num_filters
 
         pbar = tqdm(loader, desc='validate ', postfix='[0]', dynamic_ncols=True)
+        num_iters = len(pbar)
+
         for i_iter, data in enumerate(pbar):
 
             ##import pdb; pdb.set_trace()
@@ -517,13 +519,14 @@ class Trainer:
             pbar.set_postfix_str(f'{avg_loss1.get_average():.1e}')
 
             ## STOI evaluation with LWS
-            if i_iter < hp.num_stoi: 
-                _x = x[0,0,:,:T_ys[0]].cpu()
-                _y = y[0,0,:,:T_ys[0]].cpu()
-                _z = z[0,0,:,:T_ys[0]].cpu()
+            for p in range(min(hp.num_stoi// num_iters,len(T_ys))):
+
+                _x = x[p,0,:,:T_ys[p]].cpu()
+                _y = y[p,0,:,:T_ys[p]].cpu()
+                _z = z[p,0,:,:T_ys[p]].cpu()
 
                 audio_x = self.audio_from_mag_spec(np.abs(_x.numpy()))
-                y_wav = data['wav'][0]
+                y_wav = data['wav'][p]
 
                 stoi_score= self.calc_stoi(y_wav, audio_x)
                 avg_stoi.update(stoi_score)

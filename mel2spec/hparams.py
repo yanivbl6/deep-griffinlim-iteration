@@ -53,7 +53,7 @@ class _HyperParameters:
 
 
     ## validation
-    num_stoi: int = 100
+    num_stoi: int = 250
 
     #loss
     crit: str = "l1"
