@@ -8,6 +8,8 @@ from collections import OrderedDict
 
 from numpy.linalg import pinv
 
+def str2act(txt, param= None):
+    return {"sigmoid": nn.Sigmoid(), "relu": nn.ReLU(), "none": nn.Sequential() , "lrelu": nn.LeakyReLU(param), "selu": nn.SELU() }[txt.lower()]
 
 
 class melGen(nn.Module):
@@ -48,7 +50,7 @@ class melGen(nn.Module):
 
         for i,ch_out in enumerate(layer_specs[2:]):
             d = OrderedDict()
-            d['act'] = nn.LeakyReLU(self.lamb)
+            d['act'] = str2act(self.act1,self.lamb)
             gain  = math.sqrt(2.0/(1.0+self.lamb**2))
             gain = gain / math.sqrt(2)  ## for naive signal propagation with residual + bn
 
@@ -73,7 +75,7 @@ class melGen(nn.Module):
         for i,ch_out in enumerate(layer_specs[1:]):
 
             d = OrderedDict()
-            d['act'] = nn.ReLU()
+            d['act'] = str2act(self.act2,self.lamb)
             gain  =  math.sqrt(2.0/(1.0+self.lamb**2))
             gain = gain / math.sqrt(2) 
             
@@ -179,7 +181,7 @@ class melGen(nn.Module):
 
         return conv
 
-    def parse(self, writer, layers:int, audio_fs:int , subseq_len:int, ngf:int, ndf:int, separable_conv:bool, use_batchnorm:bool, lamb:float, droprate:float,  num_dropout:int, pre_final_lin: bool):
+    def parse(self, writer, layers:int, audio_fs:int , subseq_len:int, ngf:int, ndf:int, separable_conv:bool, use_batchnorm:bool, lamb:float, droprate:float,  num_dropout:int, pre_final_lin: bool, act1: str, act2:str):
         self.writer = writer
         self.n_layers = layers
         self.audio_fs = audio_fs
@@ -192,5 +194,6 @@ class melGen(nn.Module):
         self.droprate = droprate
         self.num_dropout = num_dropout
         self.pre_final_lin = pre_final_lin
-
+        self.act1 = act1
+        self.act2 = act2
 

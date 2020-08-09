@@ -50,20 +50,7 @@ class _HyperParameters:
     max_wav_value: float = 32768.0
 
 
-    #model
 
-    layers: int = 8
-    use_bn: bool = False
-    audio_fs: int = 22050
-    subseq_len: int = 256
-    ngf: int  = 64
-    ndf: int = 64
-    separable_conv: bool = False
-    use_batchnorm: bool = False
-    lamb: float = 0.2
-    droprate: float = 0.1
-    num_dropout: int = 3
-    pre_final_lin: bool = False
 
     ## validation
     num_stoi: int = 100
@@ -92,7 +79,7 @@ class _HyperParameters:
     n_glim_iter: int = 100
     repeat_train: int = 1
     repeat_test: int = 32
-    noisy_init: bool = False
+    noisy_init: bool = True
 
     # paths
     # logdir will be converted to type Path in the init_dependent_vars function
@@ -142,17 +129,22 @@ class _HyperParameters:
                           out_all_block=True
                           )
 
-        self.mel_generator = dict( layers=self.layers,
-                                audio_fs = self.audio_fs,
-                                subseq_len = self.subseq_len,
-                                ngf = self.ngf,
-                                ndf = self.ndf,
-                                separable_conv = self.separable_conv,
-                                use_batchnorm = self.use_batchnorm,
-                                lamb = self.lamb,
-                                droprate = self.droprate,
-                                num_dropout = self.num_dropout,
-                                pre_final_lin = self.pre_final_lin
+    #model
+
+
+        self.mel_generator = dict( layers= 8,
+                                audio_fs = 22050,
+                                subseq_len = 256,
+                                ngf = 64,
+                                ndf = 64,
+                                separable_conv = False,
+                                use_batchnorm = False,
+                                lamb = 0.2,
+                                droprate = 0.1,
+                                num_dropout = 3,
+                                pre_final_lin = True,
+                                act1 = "lrelu",
+                                act2 = "relu"
                                 )
 
         self.scheduler = dict(mode='min',
