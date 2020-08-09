@@ -408,14 +408,14 @@ class Trainer:
 
             for _ in range(3):
                 _, output, residual = self.model(x, mag, max_length,
-                                                repeat=1, train_step = hp.pretrain_steps + 1) ##warn up!
+                                                repeat=1, train_step = 1) ##warn up!
                 _, output = self.model.plain_gla(x, mag, max_length,
                                                 repeat=repeats)
 
             while repeats <= hp.repeat_test:
                 stime = ms()
                 _, output, residual = self.model(x, mag, max_length,
-                                                repeat=repeats, train_step = hp.pretrain_steps + 1)
+                                                repeat=repeats, train_step =1)
                 avg_measure = AverageMeter()
                 avg_measure2 = AverageMeter()
 
@@ -508,7 +508,7 @@ class Trainer:
                 # get data
                 x, mag, max_length, y = self.preprocess(data)  # B, C, F, T
                 _, output, residual = self.model(x, mag, max_length,
-                                                repeat=repeats, train_step = hp.pretrain_steps + 1)
+                                                repeat=repeats, train_step =  1)
                 tot_len = tot_len + max_length
             
             etime = int(time()-stime)

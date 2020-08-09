@@ -163,27 +163,44 @@ elif args.test:
     trainer.test(loader, logdir_test)
 elif args.infer: 
 
+    tasks = hp.infer_task.split(';')
+    print(tasks)
+    infer_valid = infer_train = infer_test = False
+    for task in tasks:
+        task = task.lower()
+        if task == "train":
+            infer_train = True
+        elif task[0] == 'v':
+            infer_valid = True
+        elif task[0] == 't':
+            infer_test = True
+        else:
+            raise NotImplementedError(task)
+
+    assert (infer_valid or infer_train or  infer_test)
     # Train Set
-    dataset =  ComplexSpecDataset('valid')
-    ##dataset.set_needs(**hp.channels)
+    if infer_valid:
 
-    loader = DataLoader(dataset,
-                        batch_size=hp.batch_size * 2,
-                        num_workers=num_workers,
-                        collate_fn=dataset.pad_collate,
-                        pin_memory=(hp.device != 'cpu'),
-                        shuffle=False,
-                        )
+        dataset =  ComplexSpecDataset('valid')
+        ##dataset.set_needs(**hp.channels)
 
-    logdir_infer_valid = logdir_infer / "VALID" 
-    os.makedirs(logdir_infer_valid, exist_ok=True)
+        loader = DataLoader(dataset,
+                            batch_size=hp.batch_size * 2,
+                            num_workers=num_workers,
+                            collate_fn=dataset.pad_collate,
+                            pin_memory=(hp.device != 'cpu'),
+                            shuffle=False,
+                            )
 
-    if trainer is not None:
-        trainer.infer(loader, logdir_infer_valid)
-    else:
-        createLin(loader, logdir_infer_valid, hp.num_snr)
+        logdir_infer_valid = logdir_infer / "VALID" 
+        os.makedirs(logdir_infer_valid, exist_ok=True)
 
-    if hp.infer_all:
+        if trainer is not None:
+            trainer.infer(loader, logdir_infer_valid)
+        else:
+            createLin(loader, logdir_infer_valid, hp.num_snr)
+
+    if infer_train:
         # Train Set
         dataset = ComplexSpecDataset('train')
         loader = DataLoader(dataset,
@@ -202,6 +219,8 @@ elif args.infer:
         else:
             createLin(loader, logdir_infer_train, hp.num_snr)
         # Test Set
+    if infer_test:
+
         dataset = ComplexSpecDataset('test')
         loader = DataLoader(dataset,
                             batch_size=hp.batch_size * 2,

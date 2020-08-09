@@ -773,16 +773,15 @@ class Trainer:
         :param logdir: path of the result files.
         :param epoch:
         """
-
-        def save_feature(num_snr :int, i_speech: int, s_path_speech: str, speech: ndarray, mag_mel2spec) -> tuple:
-
-            ##import pdb; pdb.set_trace()
+        def save_feature(num_snr, i_speech: int, s_path_speech: str, speech: ndarray, mag_mel2spec) -> tuple:
             spec_clean = np.ascontiguousarray(librosa.stft(speech, **hp.kwargs_stft))
-            signal_power = np.mean(np.abs(speech)**2)
+            mag_clean = np.ascontiguousarray(np.abs(spec_clean)[..., np.newaxis])
+            
 
+            signal_power = np.mean(np.abs(speech)**2)
             list_dict = []
             list_snr_db = []
-            for _ in enumerate(num_snr):
+            for _ in enumerate(range(num_snr)):
                 snr_db = -6*np.random.rand()
                 list_snr_db.append(snr_db)
                 snr = librosa.db_to_power(snr_db)
@@ -793,6 +792,7 @@ class Trainer:
 
                 list_dict.append(
                     dict(spec_noisy=spec_noisy,
+                        speech=speech,
                         spec_clean=spec_clean,
                         mag_clean=mag_mel2spec,
                         path_speech=s_path_speech,
@@ -812,7 +812,7 @@ class Trainer:
         pbar = tqdm(loader, desc='mel2inference', postfix='[0]', dynamic_ncols=True)
 
         form= '{:05d}_mel2spec_{:+.2f}dB.npz' 
-        num_snr = range(hp.num_snr) 
+        num_snr = hp.num_snr
         for i_iter, data in enumerate(pbar):
 
             ##import pdb; pdb.set_trace()
@@ -824,12 +824,10 @@ class Trainer:
 
             for p in range(len(T_ys)):
                 _x = x[p,0,:,:T_ys[p]].unsqueeze(2).cpu().numpy()
+                ##import pdb; pdb.set_trace()
+                speech = data['wav'][p].numpy()
 
-                path_speech= paths[p]
-
-                speech = sf.read(str(path_speech))[0].astype(np.float32)
-
-                list_snr_db, list_dict = save_feature(num_snr, cnt, str(path_speech), speech, _x)
+                list_snr_db, list_dict = save_feature(num_snr, cnt, data['path_speech'][p] , speech, _x)
                 cnt = cnt + 1
                 for snr_db, dict_result in zip(list_snr_db, list_dict):
                     np.savez(logdir / form.format(cnt, snr_db),

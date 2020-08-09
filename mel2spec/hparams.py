@@ -126,7 +126,8 @@ class _HyperParameters:
     kwargs_istft: Dict[str, Any] = None
 
     #inference
-    infer_all: bool = False
+    infer_task: str = "valid,test,train"
+
 
     def __post_init__(self):
         self.channels = dict(path_speech=Channel.NONE,

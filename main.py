@@ -77,12 +77,15 @@ if args.test or args.perf:
     logdir_test = hp.logdir
     if hp.dest_test == '':
         foldername_test = f'test_{args.epoch}'
+        if hp.n_save_block_outs > 0:
+            foldername_test += '_blockouts'
+        logdir_test /= foldername_test
     else:
-        foldername_test = Path(hp.dest_test)
+        logdir_test = Path(hp.dest_test)
+        
 
-    if hp.n_save_block_outs > 0:
-        foldername_test += '_blockouts'
-    logdir_test /= foldername_test
+
+
     if logdir_test.exists() and list(logdir_test.glob(tfevents_fname)):
         ##ans = input(form_overwrite_msg.format(logdir_test))
         ans ='y'

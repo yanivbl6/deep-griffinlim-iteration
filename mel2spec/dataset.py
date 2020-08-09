@@ -113,6 +113,7 @@ class ComplexSpecDataset(Dataset):
         result = dict()
         T_ys = np.array([item.pop('T_y') for item in batch])
         idxs_sorted = np.argsort(T_ys)
+        T_ys = [T_ys[idx] for idx in idxs_sorted]
         length = [batch[idx].pop('length') for idx in idxs_sorted]
 
         result['T_ys'], result['length'] = T_ys, length
