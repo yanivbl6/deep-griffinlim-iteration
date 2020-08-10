@@ -141,7 +141,7 @@ class _HyperParameters:
 
 
         self.ed_model = dict(layers= 4,
-                            k_x = 3, k_y = 3,
+                            k_x = 3, k_y = 5,
                             s_x = 1, s_y = 2,
                             widening = 16, 
                             use_bn = False,

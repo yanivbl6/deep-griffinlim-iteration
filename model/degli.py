@@ -281,7 +281,7 @@ class DeGLI_ED(nn.Module):
             gain  = math.sqrt(2.0/(1.0+self.lamb**2))
             gain = gain / math.sqrt(2)  ## for naive signal propagation with residual w/o bn
 
-            conv, pad  = self._gen_conv(last_ch ,ch_out, gain = gain, convGlu = self.convGlu)
+            conv, pad  = self._gen_conv(last_ch ,ch_out, gain = gain, convGlu = self.convGlu, kernel_size = self.k_xy)
 
             d['pad'] = pad
             d['conv'] = conv
@@ -325,8 +325,8 @@ class DeGLI_ED(nn.Module):
 
     def parse(self, layers:int, k_x:int, k_y:int, s_x:int, s_y:int, widening:int,use_bn: bool, lamb: float, linear_finalizer:bool, convGlu: bool, act: str, act2 : str, glu_bn:bool) :
         self.n_layers = layers
-        self.k_xy = (k_x, k_y)
-        self.s_xy = (s_x, s_y)
+        self.k_xy = (k_y, k_x)
+        self.s_xy = (s_y, s_x)
         self.widening = widening
         self.use_batchnorm = use_bn
         self.lamb = lamb
@@ -361,8 +361,15 @@ class DeGLI_ED(nn.Module):
 
         return x
 
-    def _gen_conv(self, in_ch,  out_ch, strides = (2, 1), kernel_size = (5,3), gain = math.sqrt(2), pad = (1,1,1,2), convGlu = False):
+    def _gen_conv(self, in_ch,  out_ch, strides = (2, 1), kernel_size = (5,3), gain = math.sqrt(2), convGlu = False):
         # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
+        ky,kx = kernel_size
+        p1x = (kx-1)//2
+        p2x = kx-1 - p1x
+        p1y = (ky-1)//2
+        p2y = ky-1 - p1y
+        pad = (p1x,p2x,p1y-1 , p2y)
+
         pad = torch.nn.ReplicationPad2d(pad)
         if convGlu:
             conv =  ConvGLU(in_ch, out_ch, kernel_size=kernel_size, stride = strides, batchnorm=self.glu_bn , padding=(0,0), act= "sigmoid")

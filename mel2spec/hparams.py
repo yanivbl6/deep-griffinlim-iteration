@@ -135,7 +135,7 @@ class _HyperParameters:
         self.mel_generator = dict( layers= 8,
                                 audio_fs = 22050,
                                 subseq_len = 256,
-                                ngf = 64,
+                                ngf = 16,
                                 ndf = 64,
                                 separable_conv = False,
                                 use_batchnorm = False,
