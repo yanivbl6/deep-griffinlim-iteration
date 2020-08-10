@@ -43,25 +43,38 @@ class Trainer:
 
         self.model = DeGLI(self.writer, config, hp.model_type,  hp.n_freq ,hp.use_fp16 , **hp.model)
 
+
+
+
+
+
+
+
         count_parameters(self.model)
 
-        self.module = self.model
         self.criterion = nn.L1Loss(reduction='none')
         self.optimizer = Adam(self.model.parameters(),
                               lr=hp.learning_rate,
                               weight_decay=hp.weight_decay,
                               )
 
+
+
+        self.module = self.model
+
         # self.optimizer = SGD(self.model.parameters(),
         #                       lr=hp.learning_rate,
         #                       weight_decay=hp.weight_decay,
         #                       )
 
+        self.__init_device(hp.device, hp.out_device)
+
+        if hp.use_fp16:
+            from apex import amp
+            self.model, self.optimizer = amp.initialize(self.model, self.optimizer, opt_level='O1')
 
         self.reused_sample = None
         self.result_eval_glim = None
-        self.__init_device(hp.device, hp.out_device)
-
         self.scheduler = lr_scheduler.ReduceLROnPlateau(self.optimizer, **hp.scheduler)
         self.max_epochs = hp.n_epochs
 
@@ -220,13 +233,14 @@ class Trainer:
 
 
         for epoch in range(first_epoch, hp.n_epochs):
+
             self.writer.add_scalar('loss/lr', self.optimizer.param_groups[0]['lr'], epoch)
-            print()
             pbar = tqdm(loader_train,
                         desc=f'epoch {epoch:3d}', postfix='[]', dynamic_ncols=True)
             avg_loss = AverageMeter(float)
             avg_grad_norm = AverageMeter(float)
 
+            
             for i_iter, data in enumerate(pbar):
                 # get data
                 x, mag, max_length, y = self.preprocess(data)  # B, C, F, T
@@ -247,6 +261,16 @@ class Trainer:
                 self.optimizer.step()
 
                 # print
+                # if np.any(np.isnan(loss.item())):
+                #     raise NameError('Loss is Nan!')
+
+                # for vname,var in self.model.named_parameters():
+                #     if np.any(np.isnan(var.detach().cpu().numpy())):
+                #         print("nan detected in %s " % vname)
+
+                ##import pdb; pdb.set_trace()
+                
+
                 avg_loss.update(loss.item(), len(T_ys))
                 pbar.set_postfix_str(f'{avg_loss.get_average():.1e}')
                 avg_grad_norm.update(grad_norm)

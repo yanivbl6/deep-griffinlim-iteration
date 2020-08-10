@@ -26,7 +26,7 @@ parser.add_argument('-d','--device',type=int, default=0)
 parser.add_argument('--dest',type=str, default="../result/inference")
 
 parser.add_argument('--network_results',type=str, default="../result/ngc_degli")
-parser.add_argument('--mel2spec_results',type=str, default="../result/ngc_mel2spec")
+parser.add_argument('--mel2spec_results',type=str, default="../result/mel2spec")
 parser.add_argument('-p','--perf', action='store_true')
 
 

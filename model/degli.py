@@ -407,11 +407,11 @@ class DeGLI(nn.Module):
         elif model_type == "ed":
             self.dnns = nn.ModuleList([DeGLI_ED( n_freq ,model_config) for _ in range(depth)])
 
-        self.use_fp16 = use_fp16
+        # self.use_fp16 = use_fp16
 
-        if self.use_fp16:
-            for dnn in self.dnns:
-                dnn = dnn.half()
+        # if self.use_fp16:
+        #     for dnn in self.dnns:
+        #         dnn = dnn.half()
 
     def stft(self, x):
         return torch.stft(x, n_fft=self.n_fft, hop_length=self.hop_length, window=self.window)
@@ -432,10 +432,10 @@ class DeGLI(nn.Module):
 
                 # B, 2, F, T
                 consistent = consistent.permute(0, 3, 1, 2)
-                if self.use_fp16:
-                    residual = dnn(x.half() , mag_replaced.half(), consistent.half(), train_step = train_step).float()
-                else:
-                    residual = dnn(x , mag_replaced, consistent, train_step = train_step)
+                # if self.use_fp16:
+                #     residual = dnn(x.half() , mag_replaced.half(), consistent.half(), train_step = train_step).float()
+                # else:
+                residual = dnn(x , mag_replaced, consistent, train_step = train_step)
                 
                 x = consistent - residual
             if self.out_all_block:
