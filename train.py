@@ -520,7 +520,7 @@ class Trainer:
 
         ##pbar = tqdm(loader, desc=group, dynamic_ncols=True)
         repeats =1
-        while repeats <= hp.repeat_test:
+        while repeats*depth <= hp.repeat_test:
             stime = time()
 
 
@@ -533,15 +533,16 @@ class Trainer:
                 x, mag, max_length, y = self.preprocess(data)  # B, C, F, T
                 _, output, residual = self.model(x, mag, max_length,
                                                 repeat=repeats, train_step =  1)
-                tot_len = tot_len + max_length
+                tot_len = tot_len + max_length*x.size(0)
             
+
             etime = int(time()-stime)
-            speed =   (tot_len  / hp.fs)  / (etime )
+            speed =   (tot_len / hp.sampling_rate)  / (etime )
             self.writer.add_scalar("Test Performance/degli", speed, repeats*depth)
             repeats = repeats*2
 
         repeats =1
-        while repeats <= hp.repeat_test:
+        while repeats*depth <= hp.repeat_test:
 
             stime = time()
             pbar = tqdm(loader, desc="GLA performance, %d repeats"  % repeats, dynamic_ncols=True)
@@ -552,10 +553,10 @@ class Trainer:
                 x, mag, max_length, y = self.preprocess(data)  # B, C, F, T
                 _, output = self.model.plain_gla(x, mag, max_length,
                                                 repeat=repeats)
-                tot_len = tot_len + max_length
+                tot_len = tot_len + max_length*x.size(0)
 
             etime = int(time()-stime)
-            speed =   (tot_len  / hp.fs)  / (etime)
+            speed =   (tot_len  / hp.sampling_rate)  / (etime)
             self.writer.add_scalar("Test Performance/gla", speed, repeats*depth)
             repeats = repeats*2
             

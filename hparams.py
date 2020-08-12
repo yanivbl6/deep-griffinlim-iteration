@@ -67,7 +67,7 @@ class _HyperParameters:
     n_save_block_outs: int = 0
     n_glim_iter: int = 100
     repeat_train: int = 2
-    repeat_test: int = 64
+    repeat_test: int = 256
     noisy_init: bool = True
     speed_test: bool = False
 

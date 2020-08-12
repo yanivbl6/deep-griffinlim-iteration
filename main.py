@@ -148,6 +148,7 @@ elif args.test:
                         )
     trainer.test(loader, logdir_test)
 else:
+    trainer.model.out_all_block = False
     dataset_valid = ComplexSpecDataset('valid')
     loader_valid = DataLoader(dataset_valid,
                             batch_size=hp.batch_size * 2,
