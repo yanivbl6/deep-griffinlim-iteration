@@ -270,7 +270,7 @@ class DeGLI_ED(nn.Module):
 
         self.encoders = nn.ModuleList()
 
-        conv, pad = self._gen_conv(layer_specs[0] ,layer_specs[1], convGlu = self.convGlu)
+        conv, pad = self._gen_conv(layer_specs[0] ,layer_specs[1], convGlu = self.convGlu, rounding_needed  = True)
         self.encoders.append(nn.Sequential(pad, conv))
         
         last_ch = layer_specs[1]
@@ -282,8 +282,8 @@ class DeGLI_ED(nn.Module):
             gain = gain / math.sqrt(2)  ## for naive signal propagation with residual w/o bn
 
             conv, pad  = self._gen_conv(last_ch ,ch_out, gain = gain, convGlu = self.convGlu, kernel_size = self.k_xy)
-
-            d['pad'] = pad
+            if not pad is None:
+                d['pad'] = pad
             d['conv'] = conv
 
             if self.use_batchnorm:
@@ -343,7 +343,6 @@ class DeGLI_ED(nn.Module):
 
         encoders_output = []
 
-
         for i,encoder in enumerate(self.encoders):
             x = encoder(x)
             encoders_output.append(x)
@@ -361,20 +360,27 @@ class DeGLI_ED(nn.Module):
 
         return x
 
-    def _gen_conv(self, in_ch,  out_ch, strides = (2, 1), kernel_size = (5,3), gain = math.sqrt(2), convGlu = False):
+    def _gen_conv(self, in_ch,  out_ch, strides = (2, 1), kernel_size = (5,3), gain = math.sqrt(2), convGlu = False, rounding_needed= False):
         # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
         ky,kx = kernel_size
         p1x = (kx-1)//2
         p2x = kx-1 - p1x
         p1y = (ky-1)//2
         p2y = ky-1 - p1y
-        pad = (p1x,p2x,p1y-1 , p2y)
 
-        pad = torch.nn.ReplicationPad2d(pad)
+        if rounding_needed:
+            pad_counts = (p1x,p2x,p1y-1 , p2y)
+            pad = torch.nn.ReplicationPad2d(pad_counts)
+        else:
+            pad = None
+
         if convGlu:
             conv =  ConvGLU(in_ch, out_ch, kernel_size=kernel_size, stride = strides, batchnorm=self.glu_bn , padding=(0,0), act= "sigmoid")
         else:
-            conv =  nn.Conv2d(in_ch, out_ch, kernel_size=kernel_size, stride = strides , padding=0)
+            if pad is None:
+                conv =  nn.Conv2d(in_ch, out_ch, kernel_size=kernel_size, stride = strides, padding = (p1y, p1x) )
+            else:
+                conv =  nn.Conv2d(in_ch, out_ch, kernel_size=kernel_size, stride = strides , padding=0)
 
         w = conv.weight
         k = w.size(1) * w.size(2) * w.size(3)
