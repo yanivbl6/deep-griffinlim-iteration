@@ -32,6 +32,7 @@ sys.path.insert(0, '../')
 from hparams import hp
 from tbwriter import CustomWriter
 from utils import AverageMeter, arr2str, draw_spectrogram, print_to_file, calc_using_eval_module, count_parameters
+from optimizers.radam import RAdam
 
 from time import time
 
@@ -98,16 +99,22 @@ class Trainer:
                         
         self.filters = [gen_filter(k) for  k,s in self.f_specs]
 
+        if hp.optimizer == "adam":
+            self.optimizer = Adam(self.model.parameters(),
+                                lr=hp.learning_rate,
+                                weight_decay=hp.weight_decay,
+                                )
+        elif hp.optimizer == "sgd":
+            self.optimizer = SGD(self.model.parameters(),
+                                lr=hp.learning_rate,
+                                weight_decay=hp.weight_decay,
+                                )
+        elif hp.optimizer == "radam":
+            self.optimizer = RAdam(self.model.parameters(),
+                                lr=hp.learning_rate,
+                                weight_decay=hp.weight_decay,
+                                )
 
-        self.optimizer = Adam(self.model.parameters(),
-                              lr=hp.learning_rate,
-                              weight_decay=hp.weight_decay,
-                              )
-
-        # self.optimizer = SGD(self.model.parameters(),
-        #                       lr=hp.learning_rate,
-        #                       weight_decay=hp.weight_decay,
-        #                       )
 
 
         self.__init_device(hp.device)

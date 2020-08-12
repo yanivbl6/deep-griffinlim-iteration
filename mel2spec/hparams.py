@@ -68,6 +68,8 @@ class _HyperParameters:
     learning_rate: float = 5e-4
     thr_clip_grad: float = 4.
     weight_decay: float = 1e-3  # Adam weight_decay
+    optimizer : str = "adam"
+
 
     # testing
     request_drawings: bool = False
