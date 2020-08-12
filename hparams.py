@@ -135,21 +135,21 @@ class _HyperParameters:
 
         self.model = dict(n_fft=self.n_fft,
                           hop_length=self.l_hop,
-                          depth=2,
+                          depth=1,
                           out_all_block=True
                           )
 
 
-        self.ed_model = dict(layers= 4,
+        self.ed_model = dict(layers= 6,
                             k_x = 3, k_y = 5,
                             s_x = 1, s_y = 2,
                             widening = 16, 
-                            use_bn = False,
-                            lamb = 0.2,
+                            use_bn = True,
+                            lamb = 0.1,
                             linear_finalizer = True,
                             convGlu = False,
                             act = "relu",
-                            act2 = "lrelu",
+                            act2 = "selu",
                             glu_bn = True
                             )
 

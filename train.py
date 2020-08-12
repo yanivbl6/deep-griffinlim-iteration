@@ -43,13 +43,6 @@ class Trainer:
 
         self.model = DeGLI(self.writer, config, hp.model_type,  hp.n_freq ,hp.use_fp16 , **hp.model)
 
-
-
-
-
-
-
-
         count_parameters(self.model)
 
         self.criterion = nn.L1Loss(reduction='none')
@@ -71,7 +64,11 @@ class Trainer:
 
         if hp.use_fp16:
             from apex import amp
-            self.model, self.optimizer = amp.initialize(self.model, self.optimizer, opt_level='O1')
+            self.model.dnns[0], self.optimizer = amp.initialize(self.model.dnns[0], self.optimizer, opt_level='O1')
+        else:
+            from apex import amp
+            self.model.dnns[0], self.optimizer = amp.initialize(self.model.dnns[0], self.optimizer, opt_level='O0')
+            ##self.model, self.optimizer = amp.initialize(self.model, self.optimizer, opt_level='O1')
 
         self.reused_sample = None
         self.result_eval_glim = None
@@ -261,8 +258,8 @@ class Trainer:
                 self.optimizer.step()
 
                 # print
-                # if np.any(np.isnan(loss.item())):
-                #     raise NameError('Loss is Nan!')
+                if np.any(np.isnan(loss.item())):
+                    raise NameError('Loss is Nan!')
 
                 # for vname,var in self.model.named_parameters():
                 #     if np.any(np.isnan(var.detach().cpu().numpy())):
