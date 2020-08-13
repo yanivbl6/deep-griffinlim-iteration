@@ -47,12 +47,14 @@ parser = ArgumentParser()
 
 parser.add_argument('--train', action='store_true')
 parser.add_argument('--test', action='store_true')
+parser.add_argument('--inspect', action='store_true')
+
 parser.add_argument('--infer', action='store_true')
 parser.add_argument('--from', type=int, default=-1, dest='epoch', metavar='EPOCH')
 
 args = hp.parse_argument(parser)
 del parser
-if not (args.train ^ args.test ^ args.infer ) or args.epoch < -1:
+if not (args.train ^ args.test ^ args.infer ^ args.inspect ) or args.epoch < -1:
     raise ArgumentError
 
 # directory
@@ -72,7 +74,7 @@ if (args.train and args.epoch == -1 and
     else:
         exit()
 
-if args.test:
+if args.test or args.inspect:
     logdir_test = hp.logdir
     foldername_test = f'test_{args.epoch}'
     if hp.n_save_block_outs > 0:
@@ -161,6 +163,19 @@ elif args.test:
 
     # noinspection PyUnboundLocalVariable
     trainer.test(loader, logdir_test)
+elif args.inspect: 
+    # Test Set
+    dataset_test = ComplexSpecDataset('valid')
+    loader = DataLoader(dataset_test,
+                        batch_size=hp.batch_size * 2,
+                        num_workers=num_workers,
+                        collate_fn=dataset_test.pad_collate,
+                        pin_memory=(hp.device != 'cpu'),
+                        shuffle=False,
+                        )
+
+    # noinspection PyUnboundLocalVariable
+    trainer.inspect(loader, logdir_test)
 elif args.infer: 
 
     tasks = hp.infer_task.split(';')

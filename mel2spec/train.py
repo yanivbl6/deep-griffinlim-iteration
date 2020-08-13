@@ -95,8 +95,12 @@ class Trainer:
                         4: [(3 ,1),(5, 2 ), ( 7,3 )  ],
                         5: [(15 ,5)],
                         6: [(3 ,1),(5, 2 ), ( 7,3 ), (15,5), (25,10)],
-                        7: [(1 ,1)]}[hp.loss_mode]
+                        7: [(1 ,1)],
+                        8: [(1 ,1), (3 ,1), (5, 2 ),(15 ,5),  ( 7,3 ),  (25,10), (9,4), (20,5), (5,3)   ]
+                        }[hp.loss_mode]
                         
+
+
         self.filters = [gen_filter(k) for  k,s in self.f_specs]
 
         if hp.optimizer == "adam":
@@ -127,7 +131,11 @@ class Trainer:
 
         self.__init_device(hp.device)
 
-        self.scheduler = lr_scheduler.ReduceLROnPlateau(self.optimizer, **hp.scheduler)
+        if  hp.optimizer == "novograd":
+            self.scheduler = lr_scheduler.CosineAnnealingLR(self.optimizer, 11907*3 ,1e-4)
+        else:
+            self.scheduler = lr_scheduler.ReduceLROnPlateau(self.optimizer, **hp.scheduler)
+
         self.max_epochs = hp.n_epochs
 
 
@@ -780,7 +788,172 @@ class Trainer:
 
         return 
 
+    @torch.no_grad()
+    def inspect(self, loader: DataLoader, logdir: Path):
+        """ Evaluate the performance of the model.
 
+        :param loader: DataLoader to use.
+        :param logdir: path of the result files.
+        :param epoch:
+        """
+        self.model.eval()
+
+        os.makedirs(Path(logdir), exist_ok=True)
+        self.writer = CustomWriter(str(logdir), group='test')
+
+        ##import pdb; pdb.set_trace()
+        num_filters = len(self.filters)
+
+        avg_loss1 = AverageMeter(float)
+        avg_lozz1 = AverageMeter(float)
+        avg_loss2 = AverageMeter(float)
+        avg_lozz2 = AverageMeter(float)
+
+        avg_loss_tot = AverageMeter(float)
+        avg_losses = [AverageMeter(float) for _ in range(num_filters) ]
+        avg_losses_base = [AverageMeter(float) for _ in range(num_filters) ]
+        losses = [None] * num_filters
+        losses_base = [None] * num_filters
+
+        cnt = 0
+
+        pbar = tqdm(enumerate(loader), desc='loss inspection', dynamic_ncols=True)
+
+        for i_iter, data in pbar:
+
+            ##import pdb; pdb.set_trace()
+            y = self.preprocess(data)  # B, C, F, T
+            x_mel = self.model.spec_to_mel(y) 
+
+            z = self.model.mel_pseudo_inverse(x_mel)
+
+            T_ys = data['T_ys']
+            x = self.model(x_mel)  # B, C, F, T
+            y_mel = self.model.spec_to_mel(x)     
+            z_mel = self.model.spec_to_mel(y)
+
+            loss1 = self.calc_loss(x, y, T_ys, self.criterion)
+            lozz1 = self.calc_loss(z, y, T_ys, self.criterion)
+
+            loss2 = self.calc_loss(x_mel, y_mel, T_ys, self.criterion2)
+            lozz2 = self.calc_loss(z_mel, x_mel, T_ys, self.criterion2)
+
+            loss = loss1 + loss2*hp.l2_factor
+
+            # for i,f in enumerate(self.filters):
+            #     s = self.f_specs[i][1]
+            #     losses[i] = self.calc_loss_smooth(x,y,T_ys,f, s )
+            #     loss = loss + losses[i]
+
+            for i,(k,s) in enumerate(self.f_specs):
+                losses[i] = self.calc_loss_smooth2(x,y,T_ys,k, s )
+                losses_base[i] = self.calc_loss_smooth2(y,y,T_ys,k, s )
+
+                loss = loss + losses[i]
+            avg_loss1.update(loss1.item(), len(T_ys))
+            avg_lozz1.update(lozz1.item(), len(T_ys))
+            avg_loss2.update(loss2.item(), len(T_ys))
+            avg_lozz2.update(lozz2.item(), len(T_ys))
+            avg_loss_tot.update(loss.item(), len(T_ys))
+
+            for j,l in enumerate(losses):
+                avg_losses[j].update(l.item(), len(T_ys))
+                
+            for j,l in enumerate(losses_base):
+                avg_losses_base[j].update(l.item(), len(T_ys))                
+            # print
+            ##pbar.set_postfix_str(f'{avg_loss1.get_average():.1e}')
+
+            # write summary
+
+            if 0:
+                for p in range(len(T_ys)):
+                    _x = x[p,0,:,:T_ys[p]].cpu()
+                    _y = y[p,0,:,:T_ys[p]].cpu()
+                    _z = z[p,0,:,:T_ys[p]].cpu()
+                    y_wav = data['wav'][p]
+
+                    ymin = _y[_y > 0].min()
+                    vmin, vmax = librosa.amplitude_to_db(np.array((ymin, _y.max())))
+                    kwargs_fig = dict(vmin=vmin, vmax=vmax)
+
+
+                    if hp.request_drawings:
+                        fig_x = draw_spectrogram(_x, **kwargs_fig)
+                        self.writer.add_figure(f'Audio/1_DNN_Output', fig_x, cnt)
+                        fig_y = draw_spectrogram(_y, **kwargs_fig)
+                        fig_z = draw_spectrogram(_z, **kwargs_fig)
+                        self.writer.add_figure(f'Audio/0_Pseudo_Inverse', fig_z, cnt)
+                        self.writer.add_figure(f'Audio/2_Real_Spectrogram', fig_y, cnt)
+
+                    audio_x = self.audio_from_mag_spec(np.abs(_x.numpy()))
+                    x_scale = np.abs(audio_x).max() / 0.5
+
+                    self.writer.add_audio(f'LWS/1_DNN_Output',
+                                torch.from_numpy(audio_x / x_scale),
+                                cnt,
+                                sample_rate=hp.sampling_rate)
+
+                    audio_y = self.audio_from_mag_spec(_y.numpy())
+                    audio_z = self.audio_from_mag_spec(_z.numpy())
+                    
+                    z_scale = np.abs(audio_z).max() / 0.5
+                    y_scale = np.abs(audio_y).max() / 0.5
+
+                    self.writer.add_audio(f'LWS/0_Pseudo_Inverse',
+                                torch.from_numpy(audio_z / z_scale),
+                                cnt,
+                                sample_rate=hp.sampling_rate)
+
+
+                    self.writer.add_audio(f'LWS/2_Real_Spectrogram',
+                                torch.from_numpy(audio_y / y_scale),
+                                cnt,
+                                sample_rate=hp.sampling_rate)
+
+                    ##import pdb; pdb.set_trace()
+
+                    stoi_scores = {'0_Pseudo_Inverse'       : self.calc_stoi(y_wav, audio_z),
+                                '1_DNN_Output'           : self.calc_stoi(y_wav, audio_x),
+                                '2_Real_Spectrogram'     : self.calc_stoi(y_wav, audio_y)}
+
+                    self.writer.add_scalars(f'LWS/STOI', stoi_scores, cnt )
+                    # self.writer.add_scalar(f'STOI/0_Pseudo_Inverse_LWS', self.calc_stoi(y_wav, audio_z) , cnt)
+                    # self.writer.add_scalar(f'STOI/1_DNN_Output_LWS', self.calc_stoi(y_wav, audio_x) , cnt)
+                    # self.writer.add_scalar(f'STOI/2_Real_Spectrogram_LWS', self.calc_stoi(y_wav, audio_y) , cnt)
+                    cnt = cnt + 1
+
+        for j, avg_loss in enumerate(avg_losses):
+            k = self.f_specs[j][0]
+            s = self.f_specs[j][1]
+            self.writer.add_scalar(f'inspect/losses_breakdown', avg_loss.get_average(), j)
+
+        for j, avg_loss in enumerate(avg_losses_base):
+            k = self.f_specs[j][0]
+            s = self.f_specs[j][1]
+            self.writer.add_scalar(f'inspect/losses_base_breakdown', avg_loss.get_average(), j)
+
+        for j, avg_loss in enumerate(avg_losses):
+            avg_loss2 = avg_losses_base[j]
+            k = self.f_specs[j][0]
+            s = self.f_specs[j][1]
+            self.writer.add_scalar(f'inspect/losses_normalized_breakdown', avg_loss2.get_average() / avg_loss.get_average() , j)
+
+
+        # self.writer.add_scalar(f'valid/loss', avg_loss1.get_average(), epoch)
+        # self.writer.add_scalar(f'valid/baseline', avg_lozz1.get_average(), epoch)
+        # self.writer.add_scalar(f'valid/melinv_loss', avg_loss2.get_average(), epoch)
+        # self.writer.add_scalar(f'valid/melinv_baseline', avg_lozz2.get_average(), epoch)
+
+        # for j, avg_loss in enumerate(avg_losses):
+        #     k = self.f_specs[j][0]
+        #     s = self.f_specs[j][1]
+        #     self.writer.add_scalar(f'valid/losses_{k}_{s}', avg_loss.get_average(), epoch)
+        # self.writer.add_scalar('valid/loss_total', avg_loss_tot.get_average(), epoch)
+
+        self.model.train()
+
+        return 
 
 
     @torch.no_grad()
