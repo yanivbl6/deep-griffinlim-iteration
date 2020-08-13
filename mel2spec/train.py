@@ -20,6 +20,7 @@ from torch.utils.data import DataLoader
 # from torchsummary import summary
 from tqdm import tqdm
 
+from novograd import NovoGrad
 
 import soundfile as sf
 
@@ -115,11 +116,16 @@ class Trainer:
                                 weight_decay=hp.weight_decay,
                                 )
         elif hp.optimizer == "novagrad":
-            pass
+            self.optimizer = NovoGrad(model.parameters(), 
+                                    lr=hp.learning_rate, 
+                                    weight_decay=hp.weight_decay
+                                    )
         elif hp.optimizer == "sm3":
-            pass
+            raise NameError('sm3 not implemented')
         else:
-            pass
+            raise NameError('optimizer not implemented')
+
+
         self.__init_device(hp.device)
 
         self.scheduler = lr_scheduler.ReduceLROnPlateau(self.optimizer, **hp.scheduler)

@@ -60,7 +60,8 @@ class _HyperParameters:
     thr_clip_grad: float = 4.
     weight_decay: float = 1e-3  # Adam weight_decay
     num_stoi: int = 200
-
+    optimizer: str = "adam"
+    
     # summary
     period_save_state: int = 5
     draw_test_fig: bool = False

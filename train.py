@@ -10,7 +10,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 from numpy import ndarray
 from torch import Tensor, nn
 from torch.optim import Adam, SGD
-
+from novograd import NovoGrad
 
 
 from torch.utils.data import DataLoader
@@ -53,11 +53,30 @@ class Trainer:
         count_parameters(self.model)
 
         self.criterion = nn.L1Loss(reduction='none')
-        self.optimizer = Adam(self.model.parameters(),
-                              lr=hp.learning_rate,
-                              weight_decay=hp.weight_decay,
-                              )
-
+        if hp.optimizer == "adam":
+            self.optimizer = Adam(self.model.parameters(),
+                                lr=hp.learning_rate,
+                                weight_decay=hp.weight_decay,
+                                )
+        elif hp.optimizer == "sgd":
+            self.optimizer = SGD(self.model.parameters(),
+                                lr=hp.learning_rate,
+                                weight_decay=hp.weight_decay,
+                                )
+        elif hp.optimizer == "radam":
+            self.optimizer = RAdam(self.model.parameters(),
+                                lr=hp.learning_rate,
+                                weight_decay=hp.weight_decay,
+                                )
+        elif hp.optimizer == "novagrad":
+            self.optimizer = NovoGrad(model.parameters(), 
+                                    lr=hp.learning_rate, 
+                                    weight_decay=hp.weight_decay
+                                    )
+        elif hp.optimizer == "sm3":
+            raise NameError('sm3 not implemented')
+        else:
+            raise NameError('optimizer not implemented')
 
 
         self.module = self.model
