@@ -114,9 +114,12 @@ class Trainer:
                                 lr=hp.learning_rate,
                                 weight_decay=hp.weight_decay,
                                 )
-
-
-
+        elif hp.optimizer == "novagrad":
+            pass
+        elif hp.optimizer == "sm3":
+            pass
+        else:
+            pass
         self.__init_device(hp.device)
 
         self.scheduler = lr_scheduler.ReduceLROnPlateau(self.optimizer, **hp.scheduler)

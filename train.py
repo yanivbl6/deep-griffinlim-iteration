@@ -495,6 +495,10 @@ class Trainer:
 
                 self.writer.add_scalar(f'STOI/Average Measure/deGLI', avg_measure.get_average()[0], repeats*depth)
                 self.writer.add_scalar(f'STOI/Average Measure/GLA', avg_measure2.get_average()[0], repeats*depth)
+                self.writer.add_scalar(f'STOI/Average Measure/deGLI_semilogx', avg_measure.get_average()[0], int(repeats*depth).bit_length())
+                self.writer.add_scalar(f'STOI/Average Measure/GLA_semilogx', avg_measure2.get_average()[0], int(repeats*depth).bit_length())
+
+
                 repeats = repeats * 2
             break
         self.model.train()
@@ -521,11 +525,11 @@ class Trainer:
         ##pbar = tqdm(loader, desc=group, dynamic_ncols=True)
         repeats =1
         while repeats*depth <= hp.repeat_test:
-            stime = time()
 
 
             pbar = tqdm(loader, desc="degli performance, %d repeats" % repeats, dynamic_ncols=True)
 
+            stime = time()
 
             tot_len = 0
             for i_iter, data in enumerate(pbar):
@@ -539,6 +543,8 @@ class Trainer:
             etime = int(time()-stime)
             speed =   (tot_len / hp.sampling_rate)  / (etime )
             self.writer.add_scalar("Test Performance/degli", speed, repeats*depth)
+            self.writer.add_scalar("Test Performance/degli_semilogx", speed, int(repeats*depth).bit_length())
+
             repeats = repeats*2
 
         repeats =1
@@ -558,6 +564,8 @@ class Trainer:
             etime = int(time()-stime)
             speed =   (tot_len  / hp.sampling_rate)  / (etime)
             self.writer.add_scalar("Test Performance/gla", speed, repeats*depth)
+            self.writer.add_scalar("Test Performance/gla_semilogx", speed, int(repeats*depth).bit_length())
+
             repeats = repeats*2
             
         self.model.train()
