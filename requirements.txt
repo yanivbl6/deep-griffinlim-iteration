@@ -3,4 +3,3 @@ termcolor
 pystoi
 lws
 prettytable
-novograd

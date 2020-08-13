@@ -10,7 +10,8 @@ import torch.optim.lr_scheduler as lr_scheduler
 from numpy import ndarray
 from torch import Tensor, nn
 from torch.optim import Adam, SGD
-from novograd import NovoGrad
+from optimizers.novograd import NovoGrad
+from optimizers.radam import RAdam
 
 
 from torch.utils.data import DataLoader
@@ -68,8 +69,8 @@ class Trainer:
                                 lr=hp.learning_rate,
                                 weight_decay=hp.weight_decay,
                                 )
-        elif hp.optimizer == "novagrad":
-            self.optimizer = NovoGrad(model.parameters(), 
+        elif hp.optimizer == "novograd":
+            self.optimizer = NovoGrad(self.model.parameters(), 
                                     lr=hp.learning_rate, 
                                     weight_decay=hp.weight_decay
                                     )

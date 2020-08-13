@@ -20,8 +20,6 @@ from torch.utils.data import DataLoader
 # from torchsummary import summary
 from tqdm import tqdm
 
-from novograd import NovoGrad
-
 import soundfile as sf
 
 
@@ -34,6 +32,7 @@ from hparams import hp
 from tbwriter import CustomWriter
 from utils import AverageMeter, arr2str, draw_spectrogram, print_to_file, calc_using_eval_module, count_parameters
 from optimizers.radam import RAdam
+from optimizers.novograd import NovoGrad
 
 from time import time
 
@@ -115,8 +114,8 @@ class Trainer:
                                 lr=hp.learning_rate,
                                 weight_decay=hp.weight_decay,
                                 )
-        elif hp.optimizer == "novagrad":
-            self.optimizer = NovoGrad(model.parameters(), 
+        elif hp.optimizer == "novograd":
+            self.optimizer = NovoGrad(self.model.parameters(), 
                                     lr=hp.learning_rate, 
                                     weight_decay=hp.weight_decay
                                     )
