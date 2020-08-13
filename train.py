@@ -95,7 +95,11 @@ class Trainer:
 
         self.reused_sample = None
         self.result_eval_glim = None
-        self.scheduler = lr_scheduler.ReduceLROnPlateau(self.optimizer, **hp.scheduler)
+
+        if  hp.optimizer == "novograd":
+            self.scheduler = lr_scheduler.CosineAnnealingLR(self.optimizer, 11907*3 ,1e-4)
+        else:
+            self.scheduler = lr_scheduler.ReduceLROnPlateau(self.optimizer, **hp.scheduler)
         self.max_epochs = hp.n_epochs
 
 
