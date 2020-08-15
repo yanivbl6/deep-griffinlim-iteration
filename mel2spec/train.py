@@ -131,10 +131,10 @@ class Trainer:
 
         self.__init_device(hp.device)
 
-        if  hp.optimizer == "novograd":
-            self.scheduler = lr_scheduler.CosineAnnealingLR(self.optimizer, 200 ,1e-5)
-        else:
-            self.scheduler = lr_scheduler.ReduceLROnPlateau(self.optimizer, **hp.scheduler)
+        ##if  hp.optimizer == "novograd":
+        ##    self.scheduler = lr_scheduler.CosineAnnealingLR(self.optimizer, 200 ,1e-5)
+        ##else:
+        self.scheduler = lr_scheduler.ReduceLROnPlateau(self.optimizer, **hp.scheduler)
 
         self.max_epochs = hp.n_epochs
 
