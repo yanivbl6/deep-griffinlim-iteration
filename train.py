@@ -339,6 +339,7 @@ class Trainer:
         stoi_cnt = 0
         avg_loss = AverageMeter(float)
         avg_measure = AverageMeter(float)
+        pesq_avg_measure = AverageMeter(float)
 
         pbar = tqdm(loader, desc='validate ', postfix='[0]', dynamic_ncols=True)
 
@@ -378,12 +379,16 @@ class Trainer:
 
                     measure = calc_using_eval_module(y_wav, out_wav)
                     stoi = measure['STOI']
+                    pesq_score = measure['PESQ']
                     avg_measure.update(stoi)
+                    pesq_avg_measure.update(pesq_score)
+
                     stoi_cnt = stoi_cnt + 1
 
 
         self.writer.add_scalar(f'loss/valid', avg_loss.get_average(), epoch)
         self.writer.add_scalar(f'loss/STOI', avg_measure.get_average(), epoch)
+        self.writer.add_scalar(f'loss/PESQ', pesq_avg_measure.get_average(), epoch)
 
         self.model.train()
 
@@ -517,10 +522,15 @@ class Trainer:
 
                 cnt_sample += len(T_ys)
 
-                self.writer.add_scalar(f'STOI/Average Measure/deGLI', avg_measure.get_average()[0], repeats*depth)
-                self.writer.add_scalar(f'STOI/Average Measure/GLA', avg_measure2.get_average()[0], repeats*depth)
-                self.writer.add_scalar(f'STOI/Average Measure/deGLI_semilogx', avg_measure.get_average()[0], int(repeats*depth).bit_length())
-                self.writer.add_scalar(f'STOI/Average Measure/GLA_semilogx', avg_measure2.get_average()[0], int(repeats*depth).bit_length())
+                self.writer.add_scalar(f'STOI/Average Measure/deGLI', avg_measure.get_average()[0,0], repeats*depth)
+                self.writer.add_scalar(f'STOI/Average Measure/GLA', avg_measure2.get_average()[0,0], repeats*depth)
+                self.writer.add_scalar(f'STOI/Average Measure/deGLI_semilogx', avg_measure.get_average()[0,0], int(repeats*depth).bit_length())
+                self.writer.add_scalar(f'STOI/Average Measure/GLA_semilogx', avg_measure2.get_average()[0,0], int(repeats*depth).bit_length())
+
+                self.writer.add_scalar(f'PESQ/Average Measure/deGLI', avg_measure.get_average()[0,1], repeats*depth)
+                self.writer.add_scalar(f'PESQ/Average Measure/GLA', avg_measure2.get_average()[0,1], repeats*depth)
+                self.writer.add_scalar(f'PESQ/Average Measure/deGLI_semilogx', avg_measure.get_average()[0,1], int(repeats*depth).bit_length())
+                self.writer.add_scalar(f'PESQ/Average Measure/GLA_semilogx', avg_measure2.get_average()[0,1], int(repeats*depth).bit_length())
 
 
                 repeats = repeats * 2

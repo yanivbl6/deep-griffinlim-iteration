@@ -1,5 +1,6 @@
 dataclasses
 termcolor
 pystoi
+pesq
 lws
 prettytable

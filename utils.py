@@ -10,18 +10,20 @@ from numpy import ndarray
 
 from hparams import hp
 ##from matlab_lib import Evaluation as EvalModule
-from pystoi import stoi
 from prettytable import PrettyTable
 
 
-EVAL_METRICS = ('STOI')
 
 
+EVAL_METRICS = ('STOI','PESQ')
+
+from pesq import pesq
+from pystoi import stoi
 
 def EvalModule(clean, denoised, fs):
-    metrics = ('STOI')
-    d= stoi(clean, denoised, fs, extended = False)
-    return metrics, d
+    stoi_score = stoi(clean, denoised, fs, extended = False)
+    pesq_score = pesq( fs , np.asarray(clean), denoised, 'wb')
+    return stoi_score , pesq_score
 
 
 def calc_using_eval_module(y_clean: ndarray, y_est: ndarray,
@@ -54,9 +56,9 @@ def calc_using_eval_module(y_clean: ndarray, y_est: ndarray,
         ##sum_result = sum_result.tolist()
     else:
         # noinspection PyArgumentList
-        metrics, sum_result = EvalModule(y_clean[0, :T_ys[0]], y_est[0, :T_ys[0]], hp.fs)
+        stoi_result, pesq_results = EvalModule(y_clean[0, :T_ys[0]], y_est[0, :T_ys[0]], hp.fs)
 
-    return {'STOI': sum_result}
+    return {'STOI': stoi_result, 'PESQ': pesq_results}
 
 
 def reconstruct_wave(*args: ndarray, n_iter=0, n_sample=-1) -> ndarray:
