@@ -143,10 +143,6 @@ if __name__ == "__main__":
     os.makedirs(path_mel2, exist_ok=True)
     os.makedirs(path_mel3, exist_ok=True)
 
-    pool = mp.Pool(
-        processes=mp.cpu_count()//2 - 1,
-        initializer=lambda: np.random.seed(os.getpid()),
-    )
     results = []
 
     form="{:05d}_mel%d.npz" % hp.mel_freq

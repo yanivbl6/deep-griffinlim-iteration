@@ -62,10 +62,8 @@ class Trainer:
     def __init__(self, path_state_dict=''):
 
         ##import pdb; pdb.set_trace()
-
         self.writer: Optional[CustomWriter] = None
-
-        meltrans = create_mel_filterbank( hp.fs, hp.n_fft, fmin=hp.mel_fmin, fmax=hp.mel_fmax, n_mels=hp.mel_freq)
+        meltrans = create_mel_filterbank( hp.sampling_rate, hp.n_fft, fmin=hp.mel_fmin, fmax=hp.mel_fmax, n_mels=hp.mel_freq)
 
         self.model = melGen(self.writer, hp.n_freq, meltrans, hp.mel_generator)
         count_parameters(self.model)
