@@ -140,7 +140,7 @@ class _HyperParameters:
                                 ngf = 16,
                                 ndf = 64,
                                 separable_conv = False,
-                                use_batchnorm = False,
+                                use_batchnorm = True,
                                 lamb = 0.2,
                                 droprate = 0.1,
                                 num_dropout = 3,

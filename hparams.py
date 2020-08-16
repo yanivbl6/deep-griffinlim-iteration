@@ -60,10 +60,10 @@ class _HyperParameters:
     thr_clip_grad: float = 4.
     weight_decay: float = 1e-3  # Adam weight_decay
     num_stoi: int = 200
-    optimizer: str = "adam"
+    optimizer: str = "novograd"
     
     # summary
-    period_save_state: int = 5
+    period_save_state: int = 10
     draw_test_fig: bool = False
     n_save_block_outs: int = 0
     n_glim_iter: int = 100
@@ -142,7 +142,7 @@ class _HyperParameters:
 
 
         self.ed_model = dict(layers= 6,
-                            k_x = 3, k_y = 5,
+                            k_x = 3, k_y = 3,
                             s_x = 1, s_y = 2,
                             widening = 16, 
                             use_bn = True,
