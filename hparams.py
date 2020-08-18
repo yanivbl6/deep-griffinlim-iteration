@@ -56,12 +56,16 @@ class _HyperParameters:
     train_ratio: float = 0.90
     n_epochs: int = 200
     batch_size: int = 4
-    learning_rate: float = 5e-4
+    learning_rate: float = 0.01
     thr_clip_grad: float = 4.
     weight_decay: float = 1e-3  # Adam weight_decay
-    num_stoi: int = 200
     optimizer: str = "novograd"
-    
+
+    #validation
+    num_stoi: int = 200
+    stoi_iters: int = 32
+    stoi_iters_rate: int = 10
+
     # summary
     period_save_state: int = 10
     draw_test_fig: bool = False

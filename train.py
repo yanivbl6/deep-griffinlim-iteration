@@ -337,9 +337,17 @@ class Trainer:
 
         self.model.eval()
         stoi_cnt = 0
+        stoi_cntX = 0
+        stoi_iters = hp.stoi_iters
+        stoi_iters_rate = hp.stoi_iters_rate
+
+
         avg_loss = AverageMeter(float)
         avg_measure = AverageMeter(float)
         pesq_avg_measure = AverageMeter(float)
+
+        avg_measureX = AverageMeter(float)
+        pesq_avg_measureX = AverageMeter(float)
 
         pbar = tqdm(loader, desc='validate ', postfix='[0]', dynamic_ncols=True)
 
@@ -386,9 +394,35 @@ class Trainer:
                     stoi_cnt = stoi_cnt + 1
 
 
+
+            if (stoi_iters > 0) and (epoch % stoi_iters_rate == 0):
+                _, output, _ = self.model(x, mag, max_length, repeat=stoi_iters, train_step= step )
+
+                if stoi_cntX <= hp.num_stoi:
+                    ##import pdb; pdb.set_trace()
+                    for p in range(min(hp.num_stoi// num_iters,len(T_ys))):
+                        y_wav = data['wav'][p]
+                        out = self.postprocess(output, None, T_ys, p, None)['out']
+                        out_wav = reconstruct_wave(out, n_sample=data['length'][p])
+
+                        measure = calc_using_eval_module(y_wav, out_wav)
+                        stoi = measure['STOI']
+                        pesq_score = measure['PESQ']
+                        avg_measureX.update(stoi)
+                        pesq_avg_measureX.update(pesq_score)
+
+                        stoi_cntX = stoi_cntX + 1
+
+
+
         self.writer.add_scalar(f'loss/valid', avg_loss.get_average(), epoch)
         self.writer.add_scalar(f'loss/STOI', avg_measure.get_average(), epoch)
         self.writer.add_scalar(f'loss/PESQ', pesq_avg_measure.get_average(), epoch)
+        
+        if (stoi_iters > 0) and (epoch % stoi_iters_rate == 0):
+            self.writer.add_scalar(f'loss/PESQ_X{stoi_iters}', pesq_avg_measureX.get_average(), epoch)
+            self.writer.add_scalar(f'loss/STOI_X{stoi_iters}', avg_measureX.get_average(), epoch)
+
 
         self.model.train()
 
