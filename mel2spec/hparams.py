@@ -142,7 +142,7 @@ class _HyperParameters:
                                 separable_conv = False,
                                 use_batchnorm = True,
                                 lamb = 0.2,
-                                droprate = 0.1,
+                                droprate = 0.2,
                                 num_dropout = 3,
                                 pre_final_lin = True,
                                 act1 = "lrelu",
@@ -150,13 +150,13 @@ class _HyperParameters:
                                 )
 
         self.scheduler = dict(mode='min',
-                              factor=0.6,
-                              patience=5,
+                              factor=0.75,
+                              patience=20,
                               verbose=False,
                               threshold=0.01,
                               threshold_mode='rel',
                               cooldown=0,
-                              min_lr=1e-5,
+                              min_lr=5e-5,
                               eps=1e-08
                               )
 
