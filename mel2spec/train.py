@@ -564,7 +564,7 @@ class Trainer:
 
             # write summary
             ## if i_iter < 4:
-            if False: ## stoi is good enough until tests
+            if True: ## stoi is good enough until tests
                 x = x[0,0,:,:T_ys[0]].cpu()
                 y = y[0,0,:,:T_ys[0]].cpu()
                 z = z[0,0,:,:T_ys[0]].cpu()
@@ -587,36 +587,36 @@ class Trainer:
                         self.writer.add_figure(f'Audio{i_iter}/0_Pseudo_Inverse', fig_z, epoch)
                         self.writer.add_figure(f'Audio{i_iter}/2_Real_Spectrogram', fig_y, epoch)
 
-                else:
-                    audio_x = self.audio_from_mag_spec(np.abs(x.numpy()))
+                # else:
+                #     audio_x = self.audio_from_mag_spec(np.abs(x.numpy()))
 
 
-                    x_scale = np.abs(audio_x).max() / 0.5
+                #     x_scale = np.abs(audio_x).max() / 0.5
 
 
 
-                    self.writer.add_audio(f'Audio{i_iter}/1_DNN_Output',
-                                torch.from_numpy(audio_x / x_scale),
-                                epoch,
-                                sample_rate=hp.sampling_rate)
-                    if epoch ==0:
+                #     self.writer.add_audio(f'Audio{i_iter}/1_DNN_Output',
+                #                 torch.from_numpy(audio_x / x_scale),
+                #                 epoch,
+                #                 sample_rate=hp.sampling_rate)
+                #     if epoch ==0:
 
-                        audio_y = self.audio_from_mag_spec(y.numpy())
-                        audio_z = self.audio_from_mag_spec(z.numpy())
+                #         audio_y = self.audio_from_mag_spec(y.numpy())
+                #         audio_z = self.audio_from_mag_spec(z.numpy())
                         
-                        z_scale = np.abs(audio_z).max() / 0.5
-                        y_scale = np.abs(audio_y).max() / 0.5
+                #         z_scale = np.abs(audio_z).max() / 0.5
+                #         y_scale = np.abs(audio_y).max() / 0.5
 
-                        self.writer.add_audio(f'Audio{i_iter}/0_Pseudo_Inverse',
-                                    torch.from_numpy(audio_z / z_scale),
-                                    epoch,
-                                    sample_rate=hp.sampling_rate)
+                #         self.writer.add_audio(f'Audio{i_iter}/0_Pseudo_Inverse',
+                #                     torch.from_numpy(audio_z / z_scale),
+                #                     epoch,
+                #                     sample_rate=hp.sampling_rate)
 
 
-                        self.writer.add_audio(f'Audio{i_iter}/2_Real_Spectrogram',
-                                    torch.from_numpy(audio_y / y_scale),
-                                    epoch,
-                                    sample_rate=hp.sampling_rate)
+                #         self.writer.add_audio(f'Audio{i_iter}/2_Real_Spectrogram',
+                #                     torch.from_numpy(audio_y / y_scale),
+                #                     epoch,
+                #                     sample_rate=hp.sampling_rate)
 
 
         self.writer.add_scalar(f'valid/loss', avg_loss1.get_average(), epoch)
