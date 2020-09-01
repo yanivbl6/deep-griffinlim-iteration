@@ -43,7 +43,7 @@ class melGen(nn.Module):
 
         self.encoders = nn.ModuleList()
 
-        conv, pad = self._gen_conv(layer_specs[0] ,layer_specs[1])
+        conv, pad = self._gen_conv(layer_specs[0] ,layer_specs[1], use_weight_norm = self.use_weight_norm)
         self.encoders.append(nn.Sequential(pad, conv))
         
         last_ch = layer_specs[1]
@@ -56,7 +56,7 @@ class melGen(nn.Module):
             gain = gain / math.sqrt(2)  ## for naive signal propagation with residual + bn
 
             #if n_time > 1:
-            conv, pad  = self._gen_conv(last_ch ,ch_out, gain = gain)
+            conv, pad  = self._gen_conv(last_ch ,ch_out, gain = gain, use_weight_norm = self.use_weight_norm)
             #    n_time /= 2
             # else:
             #     n_stride1_layers += 1
@@ -85,7 +85,7 @@ class melGen(nn.Module):
             # else:
  
             kernel_size = 4 if i < len(layer_specs)-2 else 5
-            conv = self._gen_deconv(last_ch, ch_out , gain = gain, k= kernel_size)
+            conv = self._gen_deconv(last_ch, ch_out , gain = gain, k= kernel_size, use_weight_norm = self.use_weight_norm)
             ##d['pad'] = pad
             d['conv'] = conv
 
@@ -151,7 +151,7 @@ class melGen(nn.Module):
         # print(x.shape)
         return x
 
-    def _gen_conv(self, in_ch,  out_ch, strides = (2, 1), kernel_size = (5,3), gain = math.sqrt(2), pad = (1,1,1,2)):
+    def _gen_conv(self, in_ch,  out_ch, strides = (2, 1), kernel_size = (5,3), gain = math.sqrt(2), pad = (1,1,1,2) , use_weight_norm = False  ):
         # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
         if self.separable_conv:
             conv = None
@@ -161,19 +161,25 @@ class melGen(nn.Module):
             pad = torch.nn.ReplicationPad2d(pad)
             conv =  nn.Conv2d(in_ch, out_ch, kernel_size=kernel_size, stride = strides , padding=0)
 
+        if use_weight_norm:
+            conv =  torch.nn.utils.weight_norm( conv  ,name='weight')
+            
         w = conv.weight
         k = w.size(1) * w.size(2) * w.size(3)
         conv.weight.data.normal_(0.0, gain / math.sqrt(k) )
         nn.init.constant_(conv.bias,0.01)
         return conv, pad 
 
-    def _gen_deconv(self, in_ch,  out_ch, strides = (2, 1), k = 4, gain = math.sqrt(2), p =1 ):
+    def _gen_deconv(self, in_ch,  out_ch, strides = (2, 1), k = 4, gain = math.sqrt(2), p =1 , use_weight_norm = False ):
         # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
         if self.separable_conv:
             conv = None
             print("separable_conv Not implemented")
         else:
             conv =  nn.ConvTranspose2d(in_ch, out_ch, kernel_size=(k,3), stride = strides, padding_mode='zeros',padding = (p,1), dilation  = 1)
+
+        if use_weight_norm:
+            conv =  torch.nn.utils.weight_norm( conv  ,name='weight')
 
         w = conv.weight
         k = w.size(1) * w.size(2) * w.size(3)
@@ -182,7 +188,8 @@ class melGen(nn.Module):
 
         return conv
 
-    def parse(self, writer, layers:int, audio_fs:int , subseq_len:int, ngf:int, ndf:int, separable_conv:bool, use_batchnorm:bool, lamb:float, droprate:float,  num_dropout:int, pre_final_lin: bool, act1: str, act2:str):
+    def parse(self, writer, layers:int, audio_fs:int , subseq_len:int, ngf:int, ndf:int, separable_conv:bool, use_batchnorm:bool, 
+                lamb:float, droprate:float,  num_dropout:int, pre_final_lin: bool, act1: str, act2:str, use_weight_norm:bool):
         self.writer = writer
         self.n_layers = layers
         self.audio_fs = audio_fs
@@ -197,4 +204,4 @@ class melGen(nn.Module):
         self.pre_final_lin = pre_final_lin
         self.act1 = act1
         self.act2 = act2
-
+        self.use_weight_norm = use_weight_norm

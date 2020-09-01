@@ -146,7 +146,8 @@ class _HyperParameters:
                                 num_dropout = 3,
                                 pre_final_lin = True,
                                 act1 = "lrelu",
-                                act2 = "relu"
+                                act2 = "relu",
+                                use_weight_norm = False
                                 )
 
         self.scheduler = dict(mode='min',

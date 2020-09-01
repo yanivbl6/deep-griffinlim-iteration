@@ -10,7 +10,7 @@ from torch import Tensor
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 
-from hparams import Channel, hp
+from hparams2 import Channel, hp
 
 TensArr = Union[ndarray, Tensor]
 StrOrSeq = TypeVar('StrOrSeq', str, Sequence[str])

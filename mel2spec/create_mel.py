@@ -14,7 +14,7 @@ from pathlib import Path
 
 from torch.utils.data import DataLoader
 
-from hparams import hp
+from hparams2 import hp
 
 sys.path.insert(0, '../')
 
