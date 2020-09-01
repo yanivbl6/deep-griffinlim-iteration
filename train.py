@@ -19,12 +19,12 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from dataset import ComplexSpecDataset
-from hparams import hp
+from hparams1 import hp
 # noinspection PyUnresolvedReferences
-from model import DeGLI, DeqGLI
+from model1 import DeGLI
 
 from tbwriter import CustomWriter
-from utils import AverageMeter, arr2str, draw_spectrogram, print_to_file, reconstruct_wave, calc_using_eval_module, count_parameters
+from utils1 import AverageMeter, arr2str, draw_spectrogram, print_to_file, reconstruct_wave, calc_using_eval_module, count_parameters
 
 from time import time
 

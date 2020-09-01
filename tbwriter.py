@@ -8,8 +8,8 @@ from numpy import ndarray
 # from tensorboardX import SummaryWriter
 from torch.utils.tensorboard import SummaryWriter
 
-from hparams import hp
-from utils import (EVAL_METRICS,
+from hparams1 import hp
+from utils1 import (EVAL_METRICS,
                    calc_using_eval_module,
                    draw_spectrogram,
                    reconstruct_wave,

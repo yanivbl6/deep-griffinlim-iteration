@@ -9,7 +9,7 @@ from argparse import ArgumentError, ArgumentParser
 from torch.utils.data import DataLoader
 
 from dataset import ComplexSpecDataset
-from hparams import hp
+from hparams1 import hp
 from train import Trainer
 from pathlib import Path
 

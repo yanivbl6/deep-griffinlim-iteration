@@ -19,7 +19,9 @@ class Channel(Enum):
 @dataclass
 class _HyperParameters:
     # devices
-    device: Union[int, str, Sequence[str], Sequence[int]] = 'all'
+    device: Union[int, str, Sequence[str], Sequence[int]] = (0, 1, 2, 3)
+    out_device: Union[int, str] = 2
+    num_workers: int = 4
 
     # select dataset
     # feature: str = 'IV'
@@ -36,63 +38,74 @@ class _HyperParameters:
     n_fft: int = 512
     l_frame: int = 512
     n_freq: int = 257
-    mel_freq: int = 80
     l_hop: int = 256
     num_snr: int = 1
 
 
     use_mel: bool = True
     sampling_rate: int = 22050
-    filter_length: int = 1024
-    win_length: int =  1024
+##    filter_length: int = 1024
+##    win_length: int =  1024
     mel_fmin: float = 0.0
     mel_fmax: float = 8000.0
     max_wav_value: float = 32768.0
 
-
-
-
-    ## validation
-    num_stoi: int = 250
-
-    #loss
-    crit: str = "l1"
-    l2_factor: float  = 1.0
-    loss_mode: int = 3
 
     # training
     n_data: int = 0  # <=0 to use all data
     train_ratio: float = 0.90
     n_epochs: int = 200
     batch_size: int = 4
-    learning_rate: float = 5e-4
+    learning_rate: float = 0.01
     thr_clip_grad: float = 4.
     weight_decay: float = 1e-3  # Adam weight_decay
-    optimizer : str = "adam"
+    optimizer: str = "novograd"
 
-
-    # testing
-    request_drawings: bool = False
+    #validation
+    num_stoi: int = 200
+    stoi_iters: int = 32
+    stoi_iters_rate: int = 10
 
     # summary
-    period_save_state: int = 5
-    draw_test_fig: bool = True
+    period_save_state: int = 10
+    draw_test_fig: bool = False
     n_save_block_outs: int = 0
     n_glim_iter: int = 100
-    repeat_train: int = 1
-    repeat_test: int = 32
+    repeat_train: int = 2
+    repeat_test: int = 256
     noisy_init: bool = True
+    speed_test: bool = False
 
     # paths
     # logdir will be converted to type Path in the init_dependent_vars function
-    logdir: str = f'/result/mel2spec'
+    logdir: str = f'/result/deq3'
     path_speech: Path = Path('/data/TIMIT')
+    path_feature: Path = Path('/data')
     path_mel: Path = Path('./data')
-    path_features: Path = Path('./features')
+    dest_test: str = ''
+    # path_feature: Path = Path('./backup')
     sfx_featuredir: str = ''
 
 
+    use_deqGLI: bool = False
 
+    ## deq_gli parameters
+    use_deq: bool = False
+
+
+    ##model
+    model_type: str = "vanilla"
+    use_fp16: bool = False
+
+    # layers : int = 4
+    # k_x: int = 3
+    # k_y: int = 3
+    # s_x:int  = 1
+    # s_y: int = 2
+    # widening: int = 16 
+    # use_bn: bool = False
+
+    ed_model: Dict[str, Channel] = field(init=False)
 
     # file names
     form_feature: str = '{:04d}_{:+.2f}dB.npz'  # i_speech, snr_db
@@ -105,7 +118,8 @@ class _HyperParameters:
     scheduler: Dict[str, Any] = field(init=False)
     spec_data_names: Dict[str, str] = field(init=False)
 
-    mel_generator: Dict[str, Any] = field(init=False)
+    deq_config: Dict[str, Any] = field(init=False)
+    vanilla_model: Dict[str, Any] = field(init=False)
 
 
     # dependent variables
@@ -114,61 +128,73 @@ class _HyperParameters:
     kwargs_stft: Dict[str, Any] = None
     kwargs_istft: Dict[str, Any] = None
 
-    #inference
-    infer_task: str = "valid,test,train"
-
 
     def __post_init__(self):
         self.channels = dict(path_speech=Channel.NONE,
                              wav=Channel.ALL,
+                             x=Channel.ALL,
                              y=Channel.ALL,
+                             y_mag=Channel.ALL,
                              length=Channel.ALL,
                              )
 
         self.model = dict(n_fft=self.n_fft,
                           hop_length=self.l_hop,
-                          depth=2,
+                          depth=1,
                           out_all_block=True
                           )
 
-    #model
 
+        self.ed_model = dict(layers= 6,
+                            k_x = 3, k_y = 3,
+                            s_x = 1, s_y = 2,
+                            widening = 16, 
+                            use_bn = True,
+                            lamb = 0.1,
+                            linear_finalizer = True,
+                            convGlu = False,
+                            act = "relu",
+                            act2 = "selu",
+                            glu_bn = True
+                            )
 
-        self.mel_generator = dict( layers= 8,
-                                audio_fs = 22050,
-                                subseq_len = 256,
-                                ngf = 16,
-                                ndf = 64,
-                                separable_conv = False,
-                                use_batchnorm = True,
-                                lamb = 0.2,
-                                droprate = 0.2,
-                                num_dropout = 3,
-                                pre_final_lin = True,
-                                act1 = "lrelu",
-                                act2 = "relu"
+        self.vanilla_model = dict(k_x1 = 11, k_y1 = 11,
+                            k_x2 = 7, k_y2 = 7, num_channel=16,
+                            act = "sigmoid")
+
+        self.deq_config = dict( wnorm=False,
+                                num_branches = 1,
+                                base_channels = 16,
+                                ratio2head = 2,
+                                fuse_method = "SUM",
+                                droprate = 0.0,
+                                final_multiplier = 2,
+                                pretrain_steps = 10000,
+                                f_thres = 24,
+                                b_thres = 24,
+                                num_layers  = 3,
+                                ch_hidden= 16,
+                                k1 = 11, 
+                                k2 = 7, 
+                                p2 = 3,
+                                freq_embedding = 256
                                 )
 
+
         self.scheduler = dict(mode='min',
-                              factor=0.75,
-                              patience=20,
+                              factor=0.6,
+                              patience=5,
                               verbose=False,
                               threshold=0.01,
                               threshold_mode='rel',
                               cooldown=0,
-                              min_lr=5e-5,
+                              min_lr=1e-5,
                               eps=1e-08
                               )
 
         self.spec_data_names = dict(x='spec_noisy', y='spec_clean',
+                                    wav='speech',
                                     y_mag='mag_clean',
-                                    path_speech='path_speech',
-                                    length='length',
-                                    out='spec_estimated',
-                                    res='spec_dnn_output',
-                                    )
-
-        self.mel2spec_data_names = dict(y='mag_clean', wav='speech',
                                     path_speech='path_speech',
                                     length='length',
                                     out='spec_estimated',
@@ -189,12 +215,12 @@ class _HyperParameters:
 
         # path
         self.dict_path = dict(
-            wav_path= Path(self.path_speech),
-            mel_train=Path(self.path_mel) / 'TRAIN',
-            mel_test=Path(self.path_mel) / 'TEST',
-            mel_valid=Path(self.path_mel) / 'VALID',
-            path_features=Path(self.path_features),
-
+            speech_train=Path(self.path_speech) / 'TRAIN',
+            speech_test=Path(self.path_speech) / 'TEST',
+            speech_valid=Path(self.path_speech) / 'VALID',
+            feature_train=Path(self.path_feature) / 'TRAIN',
+            feature_test=Path(self.path_feature) / 'TEST',
+            feature_valid=Path(self.path_feature) / 'VALID',
 
             # normconst_train=path_feature_train / 'normconst.npz',
 

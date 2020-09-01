@@ -28,9 +28,9 @@ from melmodel import melGen
 
 import sys
 sys.path.insert(0, '../')
-from hparams import hp
+from hparams2 import hp
 from tbwriter import CustomWriter
-from utils import AverageMeter, arr2str, draw_spectrogram, print_to_file, calc_using_eval_module, count_parameters
+from utils1 import AverageMeter, arr2str, draw_spectrogram, print_to_file, calc_using_eval_module, count_parameters
 from optimizers.radam import RAdam
 from optimizers.novograd import NovoGrad
 

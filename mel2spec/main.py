@@ -35,7 +35,7 @@ from argparse import ArgumentError, ArgumentParser
 from torch.utils.data import DataLoader
 
 from dataset import ComplexSpecDataset
-from hparams import hp
+from hparams2 import hp
 from train import Trainer
 
 from create_mel import createLin

@@ -8,7 +8,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from numpy import ndarray
 
-from hparams import hp
+from hparams1 import hp
 ##from matlab_lib import Evaluation as EvalModule
 from prettytable import PrettyTable
 
@@ -95,6 +95,7 @@ def reconstruct_wave(*args: ndarray, n_iter=0, n_sample=-1) -> ndarray:
     kwarg_len = dict(length=n_sample) if n_sample != -1 else dict()
     if spec is None:
         spec = mag * np.exp(1j * phase)
+
     wave = librosa.istft(spec, **hp.kwargs_istft, **kwarg_len)
 
     return wave
