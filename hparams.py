@@ -44,8 +44,8 @@ class _HyperParameters:
 
     use_mel: bool = True
     sampling_rate: int = 22050
-    filter_length: int = 1024
-    win_length: int =  1024
+    ##filter_length: int = 1024
+    ##win_length: int =  1024
     mel_fmin: float = 0.0
     mel_fmax: float = 8000.0
     max_wav_value: float = 32768.0
