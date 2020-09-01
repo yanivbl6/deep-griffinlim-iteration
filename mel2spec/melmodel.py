@@ -34,6 +34,7 @@ class melGen(nn.Module):
             self.ngf * 8, # encoder_6: [batch, 8, 8, ngf * 8] => [batch, 4, 4, ngf * 8]
             self.ngf * 8, # encoder_7: [batch, 4, 4, ngf * 8] => [batch, 2, 2, ngf * 8]
             self.ngf * 8, # encoder_8: [batch, 2, 2, ngf * 8] => [batch, 1, 1, ngf * 8]
+            self.ngf * 8, # encoder_9: [batch, 2, 2, ngf * 8] => [batch, 1, 1, ngf * 8]
         ]
 
         layer_specs = layer_specs[0:self.n_layers+1]
