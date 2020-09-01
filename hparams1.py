@@ -155,7 +155,8 @@ class _HyperParameters:
                             convGlu = False,
                             act = "relu",
                             act2 = "selu",
-                            glu_bn = True
+                            glu_bn = True,
+                            use_weight_norm = False
                             )
 
         self.vanilla_model = dict(k_x1 = 11, k_y1 = 11,

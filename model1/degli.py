@@ -109,7 +109,7 @@ class DeGLI_ED(nn.Module):
 
         self.encoders = nn.ModuleList()
 
-        conv, pad = self._gen_conv(layer_specs[0] ,layer_specs[1], convGlu = self.convGlu, rounding_needed  = True)
+        conv, pad = self._gen_conv(layer_specs[0] ,layer_specs[1], convGlu = self.convGlu, rounding_needed  = True , use_weight_norm = self.use_weight_norm)
         self.encoders.append(nn.Sequential(pad, conv))
         
         last_ch = layer_specs[1]
@@ -120,7 +120,7 @@ class DeGLI_ED(nn.Module):
             gain  = math.sqrt(2.0/(1.0+self.lamb**2))
             gain = gain / math.sqrt(2)  ## for naive signal propagation with residual w/o bn
 
-            conv, pad  = self._gen_conv(last_ch ,ch_out, gain = gain, convGlu = self.convGlu, kernel_size = self.k_xy)
+            conv, pad  = self._gen_conv(last_ch ,ch_out, gain = gain, convGlu = self.convGlu, kernel_size = self.k_xy , use_weight_norm = self.use_weight_norm)
             if not pad is None:
                 d['pad'] = pad
             d['conv'] = conv
@@ -145,7 +145,7 @@ class DeGLI_ED(nn.Module):
             if i == len(layer_specs)-2:
                  kernel_size = 5
                  ch_out = 2
-            conv = self._gen_deconv(last_ch, ch_out , gain = gain, k= kernel_size)
+            conv = self._gen_deconv(last_ch, ch_out , gain = gain, k= kernel_size, use_weight_norm = self.use_weight_norm )
             d['conv'] = conv
 
             # if i < self.num_dropout and self.droprate > 0.0:
@@ -162,7 +162,8 @@ class DeGLI_ED(nn.Module):
             init_alpha = 0.001
             self.linear_finalizer = nn.Parameter(torch.ones(n_freq) * init_alpha , requires_grad = True)
 
-    def parse(self, layers:int, k_x:int, k_y:int, s_x:int, s_y:int, widening:int,use_bn: bool, lamb: float, linear_finalizer:bool, convGlu: bool, act: str, act2 : str, glu_bn:bool) :
+
+    def parse(self, layers:int, k_x:int, k_y:int, s_x:int, s_y:int, widening:int,use_bn: bool, lamb: float, linear_finalizer:bool, convGlu: bool, act: str, act2 : str, glu_bn:bool, use_weight_norm:bool) :
         self.n_layers = layers
         self.k_xy = (k_y, k_x)
         self.s_xy = (s_y, s_x)
@@ -174,6 +175,9 @@ class DeGLI_ED(nn.Module):
         self.act = act
         self.act2 = act2
         self.glu_bn = glu_bn
+        self.use_weight_norm = use_weight_norm
+
+
     def forward(self, x, mag_replaced, consistent, train_step = -1):
         
         
@@ -199,7 +203,7 @@ class DeGLI_ED(nn.Module):
 
         return x
 
-    def _gen_conv(self, in_ch,  out_ch, strides = (2, 1), kernel_size = (5,3), gain = math.sqrt(2), convGlu = False, rounding_needed= False):
+    def _gen_conv(self, in_ch,  out_ch, strides = (2, 1), kernel_size = (5,3), gain = math.sqrt(2), convGlu = False, rounding_needed= False, use_weight_norm = False):
         # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
         ky,kx = kernel_size
         p1x = (kx-1)//2
@@ -221,16 +225,22 @@ class DeGLI_ED(nn.Module):
             else:
                 conv =  nn.Conv2d(in_ch, out_ch, kernel_size=kernel_size, stride = strides , padding=0)
 
+        if use_weight_norm:
+            conv =  torch.nn.utils.weight_norm( conv  ,name='weight')
+
         w = conv.weight
         k = w.size(1) * w.size(2) * w.size(3)
         conv.weight.data.normal_(0.0, gain / math.sqrt(k) )
         nn.init.constant_(conv.bias,0.01)
         return conv, pad 
 
-    def _gen_deconv(self, in_ch,  out_ch, strides = (2, 1), k = 4, gain = math.sqrt(2), p =1 ):
+    def _gen_deconv(self, in_ch,  out_ch, strides = (2, 1), k = 4, gain = math.sqrt(2), p =1 , use_weight_norm = False ):
         # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
 
         conv =  nn.ConvTranspose2d(in_ch, out_ch, kernel_size= (k,3), stride = strides, padding_mode='zeros',padding = (p,1), dilation  = 1)
+
+        if use_weight_norm:
+            conv =  torch.nn.utils.weight_norm( conv  ,name='weight')
 
         w = conv.weight
         k = w.size(1) * w.size(2) * w.size(3)
